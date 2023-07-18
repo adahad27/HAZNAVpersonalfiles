@@ -16,8 +16,8 @@ int main(int argc, char** argv){
 	fout.open(argv[1]); //this creates the CSV, or overwrites the previous CSV
 	
 	//the following statements just stores the inputs from the program as values to use later
-	double sourceXCoord = stod(argv[2]) + 1;
-	double sourceYCoord = stod(argv[3]) + 1;
+	double sourceXCoord = stod(argv[2])+1;
+	double sourceYCoord = stod(argv[3])+1;
 	int squareDimension = stoi(argv[4]);
 	double upperCoeffiecient = stod(argv[5]);
 	bool noisy = stoi(argv[6]);
@@ -42,10 +42,7 @@ int main(int argc, char** argv){
 		
 		currX = i+1;
 		for(int j = 0; j < squareDimension +1; ++j){
-			if(i == squareDimension && j == squareDimension){
-				fout << 2000 << endl;
-				break;
-			}
+			
 			if(i == 0 || j == 0){
 				if(i == 0 && j == 0){
 				fout << "coordinates";
@@ -65,6 +62,9 @@ int main(int argc, char** argv){
 			else{
 				currY = j+1;
 			numToPrint = upperCoeffiecient/(pow((currX-sourceXCoord),2) + pow((currY-sourceYCoord),2));
+			if(currX-sourceXCoord == 0 && currY-sourceYCoord == 0){//if we're literally on top of the source
+				numToPrint = 2000;
+			}
 			if(noisy){
 				noise = ((double)rand()) / RAND_MAX;
 				numToPrint += noise; //there is probably a way to make this cleaner code, someone figure it out
