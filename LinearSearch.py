@@ -108,7 +108,7 @@ def LeastSquaresOneRun():
 
         initial_guess = results.x
 
-        incrementArray = polarConversion(results.x[1], results.x[2],4)
+        incrementArray = polarConversion(results.x[1], results.x[2],2)
         
         
         
@@ -116,6 +116,13 @@ def LeastSquaresOneRun():
         drone.xCoord += incrementArray[0]
         drone.yCoord += incrementArray[1]
         currCoords = [drone.xCoord, drone.yCoord]
+        if(radMap.getRadCount(currCoords[0], currCoords[1]) < radMap.getRadCount(previousCoords[0], previousCoords[1])):
+            #then we make it go in the opposite direction
+            #print("SPECIAL CASE HAS BEEN REACHED AND HOPEFULLY THIS WORKS")
+            courseAngle = math.atan((previousCoords[1]-currCoords[1])/(previousCoords[0]-currCoords[0])) + math.pi
+            currCoords = previousCoords
+            #CHANGE THE 2 HERE ACCORDING TO DISTANCE IN POLARCONVERSION, WAS TOO LAZY TO FIGURE OUT ANOTHER WAY OF DOING THIS
+            currCoords = [currCoords[0] + 2*math.cos(courseAngle), currCoords[1] + 2*math.sin(courseAngle)]
         
 
         
@@ -125,6 +132,9 @@ def LeastSquaresOneRun():
     print("The actual source coordinates are (" + str(radMap.sourceX) +", " + str(radMap.sourceY) +") and the upper coefficient is " + str(radMap.upperCoefficient))
     print("The predicted source coordinates are (" + str(results.x[1]) + ", " + str(results.x[2]) +") and the upper coefficient is " + str(results.x[0]))
 
+
+
+    #Below is code responsible for plotting the path in a graph
     xCoordList = coordinates[:, 0]
     yCoordList = coordinates[:, 1]
 
@@ -155,4 +165,4 @@ print("The error in measurement for this run was " + str(LeastSquaresOneRun()))
 #     totalCoordinateError += LeastSquaresOneRun()
 
 
-# print("The total error in 10 measurements is " + str(totalCoordinateError))
+# print("The average error in 10 measurements is " + str(totalCoordinateError/10))
