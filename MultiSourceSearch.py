@@ -12,12 +12,16 @@ class radiationSource:
 
 
     def radCount(self, location):#location is passed as an array methinks?
+        if(self.sourceX == location[0] and self.sourceY == location[1]):
+            return 2000
         return self.upperCoefficient/((self.sourceX - location[0])**2 + (self.sourceY - location[1])**2)
 
 
 
 
-
+class Drone:
+    xCoord = 0
+    yCoord = 0
 
 
 
