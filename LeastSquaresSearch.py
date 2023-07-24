@@ -134,9 +134,9 @@ def LeastSquaresOneRun():
     xCoordList = travel_log[:, 0]
     yCoordList = travel_log[:, 1]
 
-    # plt.plot(xCoordList, yCoordList)
-    # plt.scatter(radMap.sourceX, radMap.sourceY, c= "red")
-    # plt.show()
+    plt.plot(xCoordList, yCoordList)
+    plt.scatter(radMap.sourceX, radMap.sourceY, c= "red")
+    plt.show()
 
 
     return coordinateError
