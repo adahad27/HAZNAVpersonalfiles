@@ -101,14 +101,15 @@ def MultiSourceRadSim():
     drone = Drone()
 
     pf = ParticleFilter(prior_fn = prior_fn, observe_fn= observation_function, n_particles=250, resample_proportion=0.1, column_names= columns)
+    pf.predictor()
 
+    # while(True):#replace this with the actual convergence criteria later
+    #     currCoords = [drone.xCoord, drone.yCoord]
+    #     currReading = radMap.getTotalRadCount(currCoords)
+    #     internal_state = [[1,5,5]]
 
-    while(True):#replace this with the actual convergence criteria later
-        currCoords = [drone.xCoord, drone.yCoord]
-        currReading = radMap.getTotalRadCount(currCoords)
-        internal_state = [[1,5,5]]
-
-        pf.update(observed=observation_function(internal_state))
-        #Now that the measurement is taken, we generate a pdf to estimate where particles are. Move and then we reestimate where the particles go
+    #     pf.update(observed=observation_function(internal_state))
+        
+    #     #Now that the measurement is taken, we generate a pdf to estimate where particles are. Move and then we reestimate where the particles go
 
 
