@@ -58,34 +58,33 @@ def MultiSourceRadSim():
     source5 = radiationSource(random.randint(0,10),random.randint(0,10),random.randint(1,10))
     columns = ["radCount","x", "y"]# These are the names of the columns that we use to represent the state vectors, we can change this later after the particle filter works
 
-    prior_fn = independent_sample([norm(loc = 5, scale = 1).rvs,uniform(loc = 0, scale = 10).rvs, uniform(loc = 0, scale = 10).rvs])
+    prior_fn = independent_sample([uniform(loc = 50, scale = 10).rvs,uniform(loc = 0, scale = 10).rvs, uniform(loc = 0, scale = 10).rvs])
     distance = 5 #I'm just hard coding the speed of the aircraft as 5
     targetCoords = [5,5]
 
 
 
-    def dynamics_change(x, target):
-        xp = np.array(x)
-        theta = math.arctan((target[1]-drone.yCoord)/(target[0]-drone.yCoord))
-        xp[0] += distance*math.cos(theta)
-        xp[1] += distance*math.sin(theta)
-        return xp
+    def dynamics_change(x, **kwargs):
+        
+        return x
 
-    def observation_function(internal_state):
+    def observation_function(internal_state, **kwargs):
         
         internal_radCount = 0
         internal_radCount = internal_state[:,0]/((internal_state[:,1] - drone.xCoord)**2 + (internal_state[:,2] - drone.yCoord)**2)
         return internal_radCount
         
         
-
+    def noise_function(x, **kwargs):
+        return x
 
         
     
 
-    def weight_function(observed, **kwargs):
-
-        returnArray = (kwargs-observed)**2
+    def weight_function(observed, actual_state):
+        print(actual_state.shape)
+        #source = radiationSource(actual_state[1], actual_state[2], actual_state[0])
+        returnArray = (actual_state-observed)**2
         return returnArray
 
 
@@ -103,16 +102,24 @@ def MultiSourceRadSim():
 
     radMap = radiationMap(True, source1, source2, source3, source4, source5)
     drone = Drone()
-
-    pf = ParticleFilter(prior_fn = prior_fn, n_particles=250, observe_fn=observation_function, weight_fn= weight_function, resample_proportion=0.1, column_names= columns)
-    pf.predictor()
+    particleNum = 250
+    pf = ParticleFilter(
+        prior_fn = prior_fn,
+        n_particles=particleNum,
+        dynamics_fn= dynamics_change, 
+        observe_fn=observation_function,
+        weight_fn= weight_function, 
+        noise_fn = noise_function,
+        resample_proportion=0.1, 
+        column_names= columns)
+    
 
     for i in range(100):#replace this with the actual convergence criteria later
         currCoords = [drone.xCoord, drone.yCoord]
         currReading = radMap.getTotalRadCount(currCoords)
         internal_state = np.array([[1,5,5]])
-
-        pf.update(observed=internal_state)
+        readingArray = currReading*np.ones(particleNum)
+        pf.update(observed = internal_state)
         
     #     #Now that the measurement is taken, we generate a pdf to estimate where particles are. Move and then we reestimate where the particles go
     print((pf.map_state))
