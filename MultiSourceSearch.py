@@ -7,6 +7,16 @@ import math
 
 
 
+
+def polar_conversion(current_pos, target_pos, distance):
+    xdiff = target_pos[0]-current_pos[0]
+    ydiff = target_pos[1]-current_pos[1]
+    theta = math.atan(ydiff/xdiff)
+    
+    return [distance*math.cos(theta), distance*math.sin(theta)]
+
+
+
 class radiationSource:
 
     def __init__(self, sourceX, sourceY, upperCoefficient):
@@ -60,69 +70,64 @@ def MultiSourceRadSim():
 
     prior_fn = independent_sample([uniform(loc = 50, scale = 10).rvs,uniform(loc = 0, scale = 10).rvs, uniform(loc = 0, scale = 10).rvs])
     distance = 5 #I'm just hard coding the speed of the aircraft as 5
-    targetCoords = [5,5]
+
+
+class particle():
+    def __init__(self, position, weight):
+        self.position = position
+        self.weight = weight
+    def send(self, newPosition):
+        self.position = newPosition
+
+    def reweight(self, newWeight):
+        self.weight = newWeight    
 
 
 
-    def dynamics_change(x, **kwargs):
-        
-        return x
 
-    def observation_function(internal_state, **kwargs):
-        
-        internal_radCount = 0
-        internal_radCount = internal_state[:,0]/((internal_state[:,1] - drone.xCoord)**2 + (internal_state[:,2] - drone.yCoord)**2)
-        return internal_radCount
-        
-        
-    def noise_function(x, **kwargs):
-        return x
+class particleFilter():
+    def __init__(self, numberRuns):
+        self.numberRuns = numberRuns
 
-        
+    def create_uniform_particle_distributor(self, numParticles):
+        particles = np.empty(shape=(numParticles, 2))
+        #We assume that the prediction is being done in a 10x10 m square, each square we can divide into 100 cms, so we have a total of 10*100 = 1000x1000 grid
+        particles[:,0] = uniform(1000,1000,size = numParticles)
+        particles[:,1] = uniform(1000,1000,size = numParticles)
+        #particles is supposed to represent a numParticles x 2 array, that is basically an array of all the coordinates of all the particles that are produced
+        return particles
+
     
 
-    def weight_function(observed, actual_state):
-        print(actual_state.shape)
-        #source = radiationSource(actual_state[1], actual_state[2], actual_state[0])
-        returnArray = (actual_state-observed)**2
-        return returnArray
+    def allparticle_weight_average(self, particles, weights):
+        #weight is numParticles x 1 array that represents all weights
+        #this also smashes multiple clusters together if they exist, so will need to make a new average later that can work with multiple particle clusters
+        #one idea is similar to the kmeans clustering algorithm where particles are assigned to clusters based on how close they are to other points
+
+        weighted_x_average = np.sum(particles[:,0] * weights[:])/particles.size
+        weighted_y_average = np.sum(particles[:,1] * weights[:])/particles.size
+        self.mean_particle_location = [weighted_x_average, weighted_y_average]
+    
+    def particle_updater(self, particles, weights, prediction_location, distance):
+        
+        location_change = polar_conversion(self.mean_particle_location, prediction_location, 1)
+        particles[:,0] += location_change[0]
+        particles[:,1] += location_change[1]
+        #have to make sure to remove a particle if it goes outside the bounding box of 10 m, but will have to replenish those particles, this is something that I'll add later
+    
+    def particle_weight(self, drone_location):
+        
+        
 
 
         
-    
 
+    def run(self):
+        results = 0
+        for i in range(self.numberRuns):
+            results += 1
 
-
-
-
-
-
-
-
-
-    radMap = radiationMap(True, source1, source2, source3, source4, source5)
-    drone = Drone()
-    particleNum = 250
-    pf = ParticleFilter(
-        prior_fn = prior_fn,
-        n_particles=particleNum,
-        dynamics_fn= dynamics_change, 
-        observe_fn=observation_function,
-        weight_fn= weight_function, 
-        noise_fn = noise_function,
-        resample_proportion=0.1, 
-        column_names= columns)
-    
-
-    for i in range(100):#replace this with the actual convergence criteria later
-        currCoords = [drone.xCoord, drone.yCoord]
-        currReading = radMap.getTotalRadCount(currCoords)
-        internal_state = np.array([[1,5,5]])
-        readingArray = currReading*np.ones(particleNum)
-        pf.update(observed = internal_state)
-        
-    #     #Now that the measurement is taken, we generate a pdf to estimate where particles are. Move and then we reestimate where the particles go
-    print((pf.map_state))
+        return results
 
 
 
