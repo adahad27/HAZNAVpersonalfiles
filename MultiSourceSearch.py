@@ -2,21 +2,22 @@ import numpy as np
 from scipy.stats import norm, uniform
 from matplotlib import pyplot as plt
 import random
-#from pfilter import ParticleFilter, gaussian_noise, squared_error, independent_sample
+
 import math
-import particles
-from particles import distributions as dists
-from particles import state_space_models as ssm
-from particles.collectors import Moments
 
 
 
 
+#The purpose of this function is to figure out what coordinates to go to if you want to travel a certain
+#distance in a certain direction
 def polar_conversion(current_pos, target_pos, distance):
     xdiff = target_pos[0]-current_pos[0]
     ydiff = target_pos[1]-current_pos[1]
     theta = math.atan(ydiff/xdiff)
-    
+    if xdiff < 0:
+        #This was added because of the inherent limitations of using arctan() since the range of the
+        #function is limited to -pi/2 to pi/2
+        theta = theta + math.pi
     return [distance*math.cos(theta), distance*math.sin(theta)]
 
 
@@ -55,81 +56,169 @@ class Drone:
         yCoord = 0
 
 
-class predictionModel(ssm.StateSpaceModel):
-    def PX0(self):
-
-        return dists.Normal()
-        
 
 
-    def PX(self):
-        return dists.Normal()
 
-    def PY(self):
-        return dists.Normal()
+
+
+
+
+
+#These are the controls for running the particle filter under the MultiSourceRadSim() function.
+#You will have to declare the particleFilter as an object before using it. 
+#In the construction of the filter, you will have to pass in a drone object, and the list of sources that you want to simulate as well.
+#Preferably with the list of sources being randomly generated so that a double blind simulation can be performed
+
 
 
 
 def MultiSourceRadSim():
-    source1 = radiationSource(random.random(),random.random(),random.randint(1,10))
+    source1 = radiationSource(random.random() * 10 ,random.random() * 10,random.randint(1,10))
     drone = Drone()
 
-    pf = particleFilter(1, drone, source1) #The input to this is how many times you want the algorithm to be run, the drone object, and the source list which I'm currently passing in as just one object
-    pf.run(2000) #The input to this is how many particles you want
+    pf = particleFilter(drone, source1) #The input to this is how many times you want the algorithm to be run, the drone object, and the source list which I'm currently passing in as just one object
+    pf.run(10000) #The input to this is how many particles you want
 
-
-class particle():
-    def __init__(self, position, weight):
-        self.position = position
-        self.weight = weight
-    def send(self, newPosition):
-        self.position = newPosition
-
-    def reweight(self, newWeight):
-        self.weight = newWeight    
+ 
 
 
 
 
+
+"""
+This is a basic description on how particle filters work. This is not meant to be comprehensive description about it
+but just enough to help the reader get a basic idea of how they work.
+Particle Filters are used to approximate state-space systems, which a state-space system is any system whose state,
+i.e. some measurements of the system that you want to measure/predict. In our case, the system is the radiation map and 
+the counts associated with the distribution of the radiation sources. Typically in literature concerning the filter, you 
+want to predict something called the state vector, which is pretty much just a vector of what you want to predict, so in our case
+it would be something like this for single source: [xCoord of source, yCoord of source, activity of source]. Another thing of note
+about our particle filter is that the state-space system we're using it in is static for the most part, i.e., the state vector that
+we're trying to predict doesn't change. (Assumption on the part of the activity because this does not account for decay)
+
+Now for how a particle filter actually works, the algorithm behind it is actually very intuitive and not too bad for complexity,
+although certain literature makes it almost impossible to understand. YouTube videos on the topic are your friend, I've linked a 
+few recommendations at the bottom to get your feet wet. 
+The particles in the particle filter are meant to represent guesses of the state vector that are basically sprinkled about, and we rule
+these guesses out with a series of measurements.
+
+The algorithm starts out with taking a measurement, and then assigning weights to each particle/each guess based on how likely it is to be the 
+state vector. A higher weight on a particle means that it is better "guess" for where the state vector is, so on for lower weights. 
+If you're wondering how this ties in with the bayesian probability that is in theory, the way that works is that the weights are actually supposed
+to be the probabilities themselves, the weight of a particle is the probability that it is the correct guess given the measurement we just collected,
+but also all previous measurements as well. 
+This is known as the prediction step(I think?)
+
+The next part of the algorithm is something called resampling, where you systematically trim the guesses so that the particles with the lower 
+weights die out, and the particles with the higher weights live on. This is done because we want the filter to converge to places where the probability
+of having a source is high, and we don't want the filter to just fizzle out randomly. There is another thing to take care of here called 
+sample impoverishment, which basically means that overtime, the amount of particles that you have decrease, which is something you don't want to happen.
+Why you don't want this to happen is that it will mess up how the weighing works and in general, the less particles you have, the less guesses you have.
+Another thing about this step is that when you do resample, when you're trimming bad guesses, you will have to replace them with something else to avoid 
+sample impoverishment, and you actually just end up replacing them with good guesses. But the thing about this is that if there are no good guesses to 
+start with, then the algorithm won't converge properly because there was no way to lead the particles there. 
+This is known as the correction step(I think?)
+
+Now the filter itself works by basically repeatedly applying these 2 steps to narrow down the list of guesses so that we can actually get a good guess on 
+where the state vector is present. A few words about the tuning of the filter, the number of particles that you use is very very important, a high number of 
+particles means we have a much much better chance of having the particles spawn on a good spot, and then from there we can reach the source, however a higher 
+number also runs into the cost of having much more calculations to do.
+
+Here are a few YouTube recommendations:
+1.) Particle Filter explained without using equations: https://youtu.be/aUkBa1zMKv4
+2.) Particle Filter Explained With Python Code: https://youtu.be/7Z9fEpJOJdc
+3.) Particle Filter - 5 Minutes with Cyril: https://youtu.be/YBeVDxTHiYM
+4.) Particle Filters | Robot Localization: https://youtu.be/ydC0mE0ZYSA
+These are all great short videos to get your feet wet with particle filters if you've never dealt with them before.
+If you want some more indepth explanations, then I would recommend watching other lectures by Cyril Stachniss, he is
+an excellent teacher and offers invaluable insight.
+I would also personally not recommend reading theory, there is a lot of notation and other jargon that can be incredibly
+overwhelming if you don't actually understand what a particle filter does at a core level
+
+
+There are libaries that you can potentially use to implement a particle filter if you ever wanted to implement one by yourself, however
+I personally thought that the libraries over complicated what is supposed to be a simple process. However there are some good things in them that you can 
+take advantage of such as offering MCMC which could be used to improve our own particle filter.
+Another thing about particle filters is that I believe they will be much easier to adapt to multisource situations than regression options 
+such as using least squares simply because a particle filter can have multimodal distributions, which we can use to predict where multiple sources are
+simultaneously.
+
+
+Last updated this on 08/03/2023
+
+
+
+"""
+
+
+
+
+
+
+
+
+
+
+
+
+
+#The class that defines how the particle filter will be used. The function that will be used to run the
+#filter is literally called .run()
 class particleFilter():
-    def __init__(self, numberRuns, drone, source):
-        self.numberRuns = numberRuns
+    def __init__(self, drone, source):
+        
         self.drone = drone
+        self.weight = np.array([])
         self.source = source
+        self.current_average = np.array([0,0])
+        self.previous_average = np.array([0,0])
         self.flight_log = np.array([[drone.xCoord, drone.yCoord, source.radCount([drone.xCoord, drone.yCoord])]])
 
+
+    #This function distributes particles uniformly over the coordinate system for our initial guesses of
+    #the system.
     def create_uniform_particle_distributor(self, numParticles):
         particles = np.empty(shape=(numParticles, 2))
-        #We assume that the prediction is being done in a 10x10 m square, each square we can divide into 100 cms, so we have a total of 10*100 = 1000x1000 grid
-        particles[:,0] = uniform.rvs(0,1,size = numParticles)
-        particles[:,1] = uniform.rvs(0,1,size = numParticles)
+        
+        particles[:,0] = uniform.rvs(0,10,size = numParticles)
+        particles[:,1] = uniform.rvs(0,10,size = numParticles)
         #particles is supposed to represent a numParticles x 2 array, that is basically an array of all the coordinates of all the particles that are produced
         return particles
 
-    def graph_plotter(self, particles, sourceList):
-        plt.figure(clear=True)#This clears the figure if it exists before
-        
+
+
+    #This function is used to plot all the important stuff like the best guess, or the flight path, etc.
+    def graph_plotter(self, particles, sourceList):      
 
         plt.scatter(particles[:, 0], particles[:, 1])
         #plt.plot(self.flight_log[:,0], self.flight_log[:,1], c = "green")
         plt.scatter(sourceList.sourceX, sourceList.sourceY, c= "red") #Will need to make sure that internally, when sourceList is passed to this function, it is passed as an array
+        plt.plot(self.flight_log[:,0], self.flight_log[:,1]) #This prints the travel path of the drone
         plt.show()
 
+
+
+    #This function calculates the average position of all the particles, and can do it based on weight or without being based on weight
     def allparticle_weight_average(self, particles, weights, useWeight):
         #weight is numParticles x 1 array that represents all weights
         #this also smashes multiple clusters together if they exist, so will need to make a new average later that can work with multiple particle clusters
         #one idea is similar to the kmeans clustering algorithm where particles are assigned to clusters based on how close they are to other points
         if useWeight:
-            weights_to_use = np.ones(np.shape(weights))
-        weights_to_use = weights
-        weighted_x_average = np.sum(particles[:,0] * weights_to_use[:])/particles.size
-        weighted_y_average = np.sum(particles[:,1] * weights_to_use[:])/particles.size
+            weights_to_use = np.ones(np.shape(weights))/(np.shape(weights))
+        weights_to_use = self.weight_normalizer(weights)
+        weighted_x_average = np.sum(particles[:,0] * weights_to_use[:])
+        weighted_y_average = np.sum(particles[:,1] * weights_to_use[:])
         self.mean_particle_location = [weighted_x_average, weighted_y_average]
-    
+        return np.array([weighted_x_average, weighted_y_average])
     
     
     def weight_normalizer(self, weights):
-        return weights/np.sum(weights)
+        if(weights.size !=0):
+            # if(np.sum(weights) == 0):
+            #     print(np.amin(weights))
+            #     assert False
+            return abs(weights/np.sum(weights))
+        return -1
     
     def particle_resampler(self, particles, weights):
         #This function is responsbile for making sure that we generate particles closer to a better guess than to a worse guess.
@@ -183,120 +272,93 @@ class particleFilter():
         weights = np.ones(arr_size)/arr_size
         return particles
 
+
+
+    #This calculates the source activity/intensity for every guess on the board all at once.
     def source_intensity_estimator(self, currLocation,currReading,particles):
         xDiffsquared = (particles[:,0] - currLocation[0])**2 #This calculates (x0-x)^2 for every particle
         yDiffsquared = (particles[:,1] - currLocation[1])**2 #This calculates (y0-y)^2 for every particle
         intensity_array = (xDiffsquared + yDiffsquared) * currReading #Then we sum up these 2 arrays, and then we multiply the resulting array with the currReading to get estimated array for all of the sources
         return intensity_array
         
-
-    def particle_weight(self, particles, sourceFound):
+    #This function is responsible for weighing the particles and also moving the drone to places 
+    def particle_weight(self, particles):
         #predictedSource is [xCoord, yCoord, naive-strength]
         initial_reading = self.source.radCount([self.drone.xCoord, self.drone.yCoord])
         initial_intensity_estimation = self.source_intensity_estimator([self.drone.xCoord, self.drone.yCoord], initial_reading, particles)
         
-        #predictedSource = [0,0,0]
-        #For the intensity difference idea, first we have to sample a point from the existing distribution
-        particle_index = random.randint(0, np.shape(particles)[0]-1) #np.shape(particles) returns an N x 2 tuple, of which we only care about the N
+        
+        if(self.weight.size != 0):
+            particle_of_interest = particles[np.argmax(self.weight), :]
+            
+        else:
+            particle_index = random.randint(0, np.shape(particles)[0]-1) #np.shape(particles) returns an N x 2 tuple, of which we only care about the N
+            particle_of_interest = particles[particle_index,:]
+        
+        
 
-        particle_of_interest = particles[particle_index,:]
-        #We then store the particle that we have randomly sampled
-
-        coordinate_change = polar_conversion([self.drone.xCoord,self.drone.yCoord], particle_of_interest, 0.5)
-        self.drone.xCoord += 0.5 #coordinate_change[0]
-        self.drone.yCoord += 0.5 #coordinate_change[1]
+        coordinate_change = polar_conversion([self.drone.xCoord,self.drone.yCoord], particle_of_interest, 1/(math.sqrt(initial_reading)))
+        self.drone.xCoord += coordinate_change[0]
+        self.drone.yCoord += coordinate_change[1]
 
         curr_reading = self.source.radCount([self.drone.xCoord, self.drone.yCoord])
         self.flight_log = np.concatenate((self.flight_log, [[self.drone.xCoord,self.drone.yCoord, curr_reading]]))
-        curr_intensity_estimation = self.source_intensity_estimator([self.drone.xCoord, self.drone.yCoord], curr_reading, particles)
-
-        #Here we create the intensity_difference_array, and then we square the array so we don't have negative weights
-        #intensity_difference_array = curr_intensity_estimation - initial_intensity_estimation
         
-        # if 0 in intensity_difference_array:
-        #     sourceFound = True
-        #     return intensity_difference_array
-        # intensity_difference_array[:] = ((intensity_difference_array[:])**2)
-        # intensity_difference_array = self.weight_normalizer(intensity_difference_array)
-        # intensity_difference_array = 1 - intensity_difference_array
-
+        #This is estimating how much the count changes after we move the drone, and then mapping the
+        #difference to a probability.
         count_estimate = initial_intensity_estimation/((particles[:,0] - self.drone.xCoord)**2 + (particles[:,1] - self.drone.yCoord)**2)
         count_estimate -= curr_reading
-        count_estimate = np.absolute(count_estimate)
+        count_estimate[:] = 2*np.absolute(norm.cdf(-1*abs(count_estimate[:]), loc = 0, scale = 10))
 
-        new_index = np.argmin(np.absolute(count_estimate)) #This is selecting the closest value we get to 0
-        
-        rangeNums = np.where(np.logical_and(count_estimate < 10 , count_estimate > -10)) #This is selecting the range of values of differences that we get that are between -10 and 10
-        negativeNums = np.where(count_estimate < 0)
-        zero_index = np.where(np.logical_and(count_estimate < 1, count_estimate > -1)) #Same goes for this one, except the range of values of differences has been limited
-        
-        
-        count_estimate = self.weight_normalizer(1-self.weight_normalizer(count_estimate))
-        print(np.amax(count_estimate))
-        print(np.amin(count_estimate))
-        # plt.scatter(particles[rangeNums, 0], particles[rangeNums,1],c = "yellow")
-        # plt.scatter(particles[negativeNums,0],particles[negativeNums,1], c="green")
-        # plt.scatter(particles[new_index, 0], particles[new_index, 1], c = "black")
-        # plt.scatter(particles[zero_index, 0], particles[zero_index, 1], c = "cyan")
-        # plt.scatter(self.source.sourceX, self.source.sourceY, c = "red")
 
-        # ninty_above = np.where(count_estimate > 0.99)
-        # eighty_above = np.where(np.logical_and(count_estimate > 0.8, count_estimate < 0.9))
-        # seventy_above = np.where(np.logical_and(count_estimate > 0.7, count_estimate < 0.8))
-        # sixty_above = np.where(np.logical_and(count_estimate > 0.6, count_estimate < 0.7))
-        # fifty_above = np.where(np.logical_and(count_estimate > 0.5, count_estimate < 0.6))
-        # print(np.size(ninty_above))
-        # plt.scatter(particles[ninty_above, 0], particles[ninty_above,1], c = "yellow")
-        # plt.scatter(particles[eighty_above, 0], particles[eighty_above,1], c = "green")
-        # plt.scatter(particles[seventy_above, 0], particles[seventy_above,1], c = "black")
-        # plt.scatter(particles[sixty_above, 0], particles[sixty_above,1], c = "cyan")
-        # plt.scatter(particles[fifty_above, 0], particles[fifty_above,1], c = "magenta")
-        # plt.scatter(self.source.sourceX, self.source.sourceY, c = "red")
 
-        plt.plot(self.flight_log[:,0], self.flight_log[:,1])
-        plt.show()
+        #This is needed for the convergence condition for the while loop in the run function
+        self.previous_average = self.current_average
+        # print(np.sum(count_estimate))
+        self.current_average = self.allparticle_weight_average(particles, count_estimate, True)
+        # print(type(self.previous_average))
+        # print(type(self.current_average))
+        self.weight = count_estimate
+
+
+
         return count_estimate
-        #The reason why we subtract the difference from 1 is because when we do the difference, a bigger difference means that the prediction was worse,
-        #and if we want to return this as a weight, then we need to make sure that the bigger value is better, hence we subtract it from 1
-
-        #Theoretically speaking, if all goes how I'm imaging while writing this code, then intensity_difference_array 
-        #Should become the weights for the particles, 
-
-
-        #weights = math.sqrt((particles[:,0] - predictedSource[0])**2 + (particles[:,1] - predictedSource[1])**2) #This just does squared errors, will need to add considerations for the source intensity later as well
-
-        #self.flight_log = np.concatenate((self.flight_log, [[self.drone.xCoord, self.drone.yCoord, curr_reading]]))
-        return intensity_difference_array
-    
+            
+        
+    #This is the function that you actually use to run the filter. There is a while loop inside that runs until 
+    #convergence of theh particles.
     def run(self, particleNum):
         
         self.numRuns = 0
         
         particles = self.create_uniform_particle_distributor(numParticles=particleNum)
-        # plt.scatter(particles[:,0], particles[:,1])
         
-        sourceFound = False
-        for i in range(self.numberRuns):
-            #This is where the main loop of the particle filter is
-            weights = self.particle_weight(particles, sourceFound)
-            if sourceFound:
-                print("WE FOUND THE SOURCE BITCHES")
-                break
-
+        
+        
+        # The main loop runs until the difference in the averages of the particles converge to a position.
+        # We can then return the average as we know that the position returned is our best guess for 
+        # where the source(s) is located.
+        self.current_average = self.allparticle_weight_average(particles, np.ones(shape = (particleNum)) / particleNum, True)
+        # print(self.current_average)
+        # print(self.previous_average)
+        while (math.sqrt((self.current_average[0] - self.previous_average[0])**2 + (self.current_average[1] - self.previous_average[1])**2) > 0.001):
+            
+            weights = self.particle_weight(particles)
 
             particles = self.particle_resampler(particles, weights)
             self.numRuns +=1
             
             
 
-        #self.graph_plotter(particles, self.source)
-        self.allparticle_weight_average(particles, weights, False)
-        # print("The actual position was (" + str(self.source.sourceX) +", " + str(self.source.sourceY)+")")
-        # print("The predicted position was (" + str(self.mean_particle_location[0]) +", " + str(self.mean_particle_location[1])+")")
+        self.graph_plotter(particles, self.source)
+        
+        print("The actual position was (" + str(self.source.sourceX) +", " + str(self.source.sourceY)+")")
+        print("The predicted position was (" + str(self.mean_particle_location[0]) +", " + str(self.mean_particle_location[1])+")")
+        print("The algorithm converged in " + str(self.numRuns) + " steps")
         
 
 
-
+#Just calling the function once to execture the function and check how it runs.
 
 MultiSourceRadSim()
 
