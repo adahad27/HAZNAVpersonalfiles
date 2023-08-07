@@ -5,7 +5,30 @@ from scipy.optimize import least_squares
 from matplotlib import pyplot as plt
 import random
 
+"""
+This is a basic description of how the Least Squares method has been implemented in this python file. 
+Least Squares is a regression based model, what that means is that it tries to fit data points to a predefined model that we can set ourselves.
+Given data points, it tries finding the equation that minimizes the squares of the distance in between the data points and the points modeled
+by the equation.
+For this specific application we're using Non-Linear Least Squares, because the function that we're trying to regress on has a combination of vectors that 
+is non linear. If the reader is trying to figure out why we can use linear LS for polynomials but not for the model we have for radiation counts, the reason
+for that is because polynomials are actually linear combinations of vectors, where the vectors are the x^n terms where n is an element of the whole numbers.
+Since we have K/((x-x0)^2+(y-y0)^2), the vectors themselves that is the x and y terms are not in linear combinations.
 
+The way LS has been integrated in this program is by predicting where the source is from a singular data point, then travelling partially to where our prediction
+is, remeasuring, and then recalculating where the source is. We keep repeating this until the difference in between the prediction of sources is less than a 
+certain threshold value. At that point, we will know that we have reached the source, or at least a good approximation of where the source is. 
+One problem that I think that LS has that it doesn't feel like it's the most noise resistant, when I have tested it with noise, sometimes it sent the drone off 
+in a random direction, however that wasn't too often, more often than not, it converged to a location slightly off the source, but still narrowed it down pretty good.
+Will have to test this more with noise to see how much effect noise has on LS.
+
+I still have to test this with multiple sources, but dependent on how noise resistant LS is, we could potentially use this in multisource.
+
+
+Will update this if I think of anything more to add
+Last updated on 08/05/2023
+
+"""
 def LeastSquaresOneRun():    
 
     def NLS(beta, coordinates):
