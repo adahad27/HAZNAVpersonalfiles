@@ -1,7 +1,8 @@
 import numpy as np
-from scipy.stats import norm, uniform
+from scipy.stats import norm, uniform, poisson
 from matplotlib import pyplot as plt
 import random
+from sklearn.cluster import MeanShift
 
 import math
 
@@ -33,7 +34,7 @@ class radiationSource:
     def radCount(self, location):#location is passed as an array methinks?
         if(self.sourceX == location[0] and self.sourceY == location[1]):
             return 2000
-        return self.upperCoefficient/((self.sourceX - location[0])**2 + (self.sourceY - location[1])**2)
+        return (self.upperCoefficient/((self.sourceX - location[0])**2 + (self.sourceY - location[1])**2))
     
     def returnCoords(self):
         return [self.sourceX, self.sourceY]
@@ -87,12 +88,23 @@ def MultiSourceRadSim():
     source2 = radiationSource(8,7,1)
     sourceList = [source1, source2]
 
-    # source1 = radiationSource(random.random() * 10, random.random() * 10, random.randint(1,10))
-    # source2 = radiationSource(random.random() * 10, random.random() * 10, random.randint(1,10))
-    # source3 = radiationSource(random.random() * 10, random.random() * 10, random.randint(1,10))
-    # source4 = radiationSource(random.random() * 10, random.random() * 10, random.randint(1,10))
-    # source5 = radiationSource(random.random() * 10, random.random() * 10, random.randint(1,10))
-    # sourceList = [source1, source2, source3, source4, source5]
+
+
+
+    source1 = radiationSource(5,6,90)
+    source2 = radiationSource(1,9,20)
+    source3 = radiationSource(2,7,40)
+    source4 = radiationSource(6,4,70)
+    source5 = radiationSource(3,8,20)
+
+
+    # source1 = radiationSource(random.random() * 10, random.random() * 10, random.randint(20,60))
+    # source2 = radiationSource(random.random() * 10, random.random() * 10, random.randint(20,60))
+    # source3 = radiationSource(random.random() * 10, random.random() * 10, random.randint(20,60))
+    # source4 = radiationSource(random.random() * 10, random.random() * 10, random.randint(20,60))
+    # source5 = radiationSource(random.random() * 10, random.random() * 10, random.randint(20,60))
+
+    sourceList = [source1, source2, source3, source4, source5]
 
     ourRadMap = radiationMap(sourceList= sourceList)
 
@@ -102,7 +114,7 @@ def MultiSourceRadSim():
     drone = Drone()
 
     pf = particleFilter(drone, ourRadMap) #The input to this is how many times you want the algorithm to be run, the drone object, and the source list which I'm currently passing in as just one object
-    pf.run(30000) #The input to this is how many particles you want
+    pf.run(10000) #The input to this is how many particles you want
 
  
 
@@ -197,7 +209,12 @@ class particleFilter():
         self.sourceList = sourceList
         self.current_average = np.array([0,0])
         self.previous_average = np.array([0,0])
-        self.flight_log = np.array([[drone.xCoord, drone.yCoord, sourceList.getTotalRadCount([drone.xCoord, drone.yCoord])]])
+        self.flight_log = np.array([[drone.xCoord, drone.yCoord]])
+
+
+
+
+
 
 
     #This function distributes particles uniformly over the coordinate system for our initial guesses of
@@ -208,7 +225,7 @@ class particleFilter():
         particles[:,0] = uniform.rvs(0,10,size = numParticles)
         particles[:,1] = uniform.rvs(0,10,size = numParticles)
         
-        #return particles
+        return particles
         rows = np.where(np.logical_or(np.logical_or(particles[:,0] > 6, particles[:,0] <4),np.logical_or(particles[:,1] > 6, particles[:,1] <4)))
         return particles[rows]
         
@@ -216,14 +233,24 @@ class particleFilter():
 
 
 
+
+
+
+
     #This function is used to plot all the important stuff like the best guess, or the flight path, etc.
-    def graph_plotter(self, particles, map):      
+    def graph_plotter(self, particles, map, ms):      
 
         plt.scatter(particles[:, 0], particles[:, 1])
         #plt.plot(self.flight_log[:,0], self.flight_log[:,1], c = "green")
         plt.scatter(map.getCoordArray()[:,0], map.getCoordArray()[:,1], c= "red") #Will need to make sure that internally, when sourceList is passed to this function, it is passed as an array
         plt.plot(self.flight_log[:,0], self.flight_log[:,1]) #This prints the travel path of the drone
+        plt.scatter(ms.cluster_centers_[:,0], ms.cluster_centers_[:,1], c = "black")
         plt.show()
+
+
+
+
+
 
 
 
@@ -240,6 +267,12 @@ class particleFilter():
         self.mean_particle_location = [weighted_x_average, weighted_y_average]
         return np.array([weighted_x_average, weighted_y_average])
     
+
+
+
+
+
+
     
     def weight_normalizer(self, weights):
         if(weights.size !=0):
@@ -249,6 +282,12 @@ class particleFilter():
             return abs(weights/np.sum(weights))
         return -1
     
+
+
+
+
+
+
     def particle_resampler(self, particles, weights):
         #This function is responsbile for making sure that we generate particles closer to a better guess than to a worse guess.
         #This resampler is implemented according to https://robotics.stackexchange.com/questions/479/particle-filters-how-to-do-resampling
@@ -303,6 +342,14 @@ class particleFilter():
 
 
 
+
+
+
+
+
+
+
+
     #This calculates the source activity/intensity for every guess on the board all at once.
     def source_intensity_estimator(self, currLocation,currReading,particles):
         xDiffsquared = (particles[:,0] - currLocation[0])**2 #This calculates (x0-x)^2 for every particle
@@ -310,34 +357,52 @@ class particleFilter():
         intensity_array = (xDiffsquared + yDiffsquared) * currReading #Then we sum up these 2 arrays, and then we multiply the resulting array with the currReading to get estimated array for all of the sources
         return intensity_array
         
+
+
+
+
+
+
+
+
+
     #This function is responsible for weighing the particles and also moving the drone to places 
-    def particle_weight(self, particles):
+    def particle_weight(self, particles, initial_reading, curr_reading, initial_pos, curr_pos):
         #predictedSource is [xCoord, yCoord, naive-strength]
-        initial_reading = self.sourceList.getTotalRadCount([self.drone.xCoord, self.drone.yCoord])
-        initial_intensity_estimation = self.source_intensity_estimator([self.drone.xCoord, self.drone.yCoord], initial_reading, particles)
+        #initial_reading = self.sourceList.getTotalRadCount([self.drone.xCoord, self.drone.yCoord])
+        
+        initial_intensity_estimation = self.source_intensity_estimator(initial_pos, initial_reading, particles)
         
         
-        if(self.weight.size != 0):
-            particle_of_interest = particles[np.argmax(self.weight), :]
+        # if(self.weight.size != 0):
+        #     #particle_of_interest = particles[np.argmax(self.weight), :]
+        #     ninty_above = np.where(self.weight > 0.90)
+        #     particle_of_interest = np.median(particles[ninty_above],axis = 0)
             
-        else:
-            particle_index = random.randint(0, np.shape(particles)[0]-1) #np.shape(particles) returns an N x 2 tuple, of which we only care about the N
-            particle_of_interest = particles[particle_index,:]
-        
-        
 
-        coordinate_change = polar_conversion([self.drone.xCoord,self.drone.yCoord], particle_of_interest, 1/(math.sqrt(initial_reading)))
-        self.drone.xCoord += coordinate_change[0]
-        self.drone.yCoord += coordinate_change[1]
+            
+        # else:
+        #     particle_index = random.randint(0, np.shape(particles)[0]-1) #np.shape(particles) returns an N x 2 tuple, of which we only care about the N
+        #     particle_of_interest = particles[particle_index,:]
+        #     particle_of_interest = [5,5]
+        
+        # # particle_of_interest = [random.random() * 10, random.random()*10]
+        
+        # coordinate_change = polar_conversion([self.drone.xCoord,self.drone.yCoord], particle_of_interest, 1)#/(math.sqrt(initial_reading))
+        # self.drone.xCoord += coordinate_change[0]
+        # self.drone.yCoord += coordinate_change[1]
 
-        curr_reading = self.sourceList.getTotalRadCount([self.drone.xCoord, self.drone.yCoord])
-        self.flight_log = np.concatenate((self.flight_log, [[self.drone.xCoord,self.drone.yCoord, curr_reading]]))
+        # curr_reading = self.sourceList.getTotalRadCount([self.drone.xCoord, self.drone.yCoord])
+        # self.flight_log = np.concatenate((self.flight_log, [[self.drone.xCoord,self.drone.yCoord, curr_reading]]))
         
         #This is estimating how much the count changes after we move the drone, and then mapping the
         #difference to a probability.
         count_estimate = initial_intensity_estimation/((particles[:,0] - self.drone.xCoord)**2 + (particles[:,1] - self.drone.yCoord)**2)
+        #count_estimate[:] = poisson.pmf(initial_intensity_estimation[:],curr_reading)
+
         count_estimate -= curr_reading
-        count_estimate[:] = 2*np.absolute(norm.cdf(-1*abs(count_estimate[:]), loc = 0, scale = 2))
+        count_estimate[:] = count_estimate[:]
+        count_estimate[:] = 2*np.absolute(norm.cdf(-1*abs(count_estimate[:]), loc = 0, scale = 30))
 
 
 
@@ -353,14 +418,46 @@ class particleFilter():
 
         return count_estimate
             
-    
-    #The point of this function is to "cancel" the radiation caused by another source. Pretty sure this should be run after the run function converges to a point
-    def particle_noise_canceller(self, particles):
+
+
+    def move(self, isFixed ,list):
+        
+        #This is where we put in fixed path planning, maybe have something where we can try patterns, but I can't imagine we'll do something other than spirals
+        if isFixed:
+            move_coordinates_list = np.array(list)
+            
+            #So we have 2 possible ideas, the first coordinate could be (0,0) or the first coordinate could be the actual coordinate
+            #Let's just have it start with (0,0)
+            initial_intensity = self.sourceList.getTotalRadCount([self.drone.xCoord, self.drone.yCoord])
+            initial_pos = [self.drone.xCoord, self.drone.yCoord]
+
+            
+
+            curr_intensity = self.sourceList.getTotalRadCount(move_coordinates_list[self.numRuns+1, :])
+            self.drone.xCoord = move_coordinates_list[self.numRuns, 0]
+            self.drone.yCoord = move_coordinates_list[self.numRuns, 1]
+            curr_pos = [self.drone.xCoord, self.drone.yCoord]
+            self.flight_log = np.concatenate((self.flight_log, [[self.drone.xCoord,self.drone.yCoord]]))
+
+            return initial_intensity, curr_intensity, initial_pos, curr_pos
+        
+        #We can implement dynamic planning here
+        else:
+
+
+            return False
 
 
 
 
-        return False
+
+
+
+
+
+
+
+
 
 
 
@@ -376,7 +473,7 @@ class particleFilter():
         
         particles = self.create_uniform_particle_distributor(numParticles=particleNum)
         
-        
+        ms = MeanShift(bandwidth=0.5)
         
         # The main loop runs until the difference in the averages of the particles converge to a position.
         # We can then return the average as we know that the position returned is our best guess for 
@@ -385,25 +482,87 @@ class particleFilter():
         # print(self.current_average)
         # print(self.previous_average)
         
-        while (math.sqrt((self.current_average[0] - self.previous_average[0])**2 + (self.current_average[1] - self.previous_average[1])**2) > 0.001):
-            
-            weights = self.particle_weight(particles)
+        while (True):#math.sqrt((self.current_average[0] - self.previous_average[0])**2 + (self.current_average[1] - self.previous_average[1])**2) > 0.001
+            ourList = [#These are the coordinates that I drew out to draw the spiral
+                    [2,2],
+                    [5,2],
+                    [8,2],
+                    [8,5],
+                    [8,8],
+                    [5,8],
+                    [3,8],
+                    [3,6],
+                    [3,3],
+                    [6,3],
+                    [6,7],
+                    [5,7],
+                    [5,5]
+                    ]
+            initial_reading, curr_reading, initial_pos, curr_pos = self.move(True, list=ourList)
+            weights = self.particle_weight(particles, initial_reading, curr_reading, initial_pos, curr_pos)
 
             particles = self.particle_resampler(particles, weights)
             self.numRuns +=1
             
             
-            if(self.numRuns == 11):
-                plt.scatter(particles[:,0], particles[:,1])
+            if(self.numRuns == 5):
+                good_weights = np.where(weights > 0.90)
+
+                #print(type(good_weights))
+                #print((particles[good_weights, :])[0])
+                ms.fit((particles[good_weights, :])[0])
+                
+                # #cluster_centers = ms.cluster_centers_
+                # #print(cluster_centers.size)
+                # plt.scatter(particles[good_weights,0], particles[good_weights,1])
+                
+
+
+                # ninty_above = np.where(weights > 0.90)
+                # eighty_above = np.where(np.logical_and(weights > 0.8, weights < 0.9))
+                # seventy_above = np.where(np.logical_and(weights > 0.7, weights < 0.8))
+                # sixty_above = np.where(np.logical_and(weights > 0.6, weights < 0.7))
+                # fifty_above = np.where(np.logical_and(weights > 0.5, weights < 0.6))
+                
+                # plt.scatter(particles[ninty_above, 0], particles[ninty_above,1], c = "cyan")
+                # plt.scatter(particles[eighty_above, 0], particles[eighty_above,1], c = "yellow")
+                # # plt.scatter(particles[seventy_above, 0], particles[seventy_above,1], c = "black")
+                # # plt.scatter(particles[sixty_above, 0], particles[sixty_above,1], c = "green")
+                # # plt.scatter(particles[fifty_above, 0], particles[fifty_above,1], c = "magenta")
                 break
             
-
-        self.graph_plotter(particles, self.sourceList)
+            
+        self.graph_plotter(particles, self.sourceList, ms)
+        
         
         # print("The actual position was (" + str(self.source.sourceX) +", " + str(self.source.sourceY)+")")
         # print("The predicted position was (" + str(self.mean_particle_location[0]) +", " + str(self.mean_particle_location[1])+")")
         # print("The algorithm converged in " + str(self.numRuns) + " steps")
         
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 #Just calling the function once to execture the function and check how it runs.

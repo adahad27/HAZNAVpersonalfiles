@@ -84,7 +84,7 @@ def LeastSquaresOneRun():
 
     drone = Drone()
     #random.randint(0,10)
-    radMap = radiationMap(sourceX = 9 , sourceY = 7, upperCoefficient = 1, noise = False)
+    radMap = radiationMap(sourceX = random.randint(0,10) , sourceY = random.randint(0,10), upperCoefficient = random.randint(1,10), noise = False)
 
     coordinates = np.array([[drone.xCoord, drone.yCoord, radMap.getRadCount(drone.xCoord, drone.yCoord)]])# the array should have 2 dimensions. 
     
@@ -98,9 +98,10 @@ def LeastSquaresOneRun():
 
     travel_log = np.array([[0,0]]) #Replace (0,0) with the start position of the drone if it isn't (0,0)
     result_log = np.array([initial_guess])
-
+    steps = 0
     debugSum = 0
     while(math.sqrt((initial_guess[1] - prevRes[0])**2 + (initial_guess[2] - prevRes[1])**2) > 0.000001 ): #this is hard coded right now, we will have to change this to a tolerance value because this is the main loop
+        steps+=1
         debugSum += math.sqrt((initial_guess[1] - prevRes[0])**2 + (initial_guess[2] - prevRes[1])**2)
         if(debugSum > 60):
             #This is meant to prevent infinite loops from happening, the value of debugSum can be changed depending on testing data
@@ -129,6 +130,7 @@ def LeastSquaresOneRun():
         previousCoords = [drone.xCoord, drone.yCoord]
         drone.xCoord += incrementArray[0]
         drone.yCoord += incrementArray[1]
+        extraCoords = [extraCoords[0,0], extraCoords[0,1]]
         currCoords = [drone.xCoord, drone.yCoord]
         if(radMap.getRadCount(currCoords[0], currCoords[1]) < radMap.getRadCount(previousCoords[0], previousCoords[1])):
             #then we make it go in the opposite direction
@@ -140,7 +142,7 @@ def LeastSquaresOneRun():
         
         
         #This just updates the respective logs needed in case of testing/debugging
-        travel_log = np.concatenate((travel_log, [currCoords]))
+        travel_log = np.concatenate((travel_log,[previousCoords],[extraCoords] ,[currCoords]))
         result_log = np.concatenate((result_log, [results.x]))
 
         
@@ -150,7 +152,7 @@ def LeastSquaresOneRun():
     coordinateError =  math.sqrt((radMap.sourceX - results.x[1])**2 + (radMap.sourceY - results.x[2])**2)
     print("The actual source coordinates are (" + str(radMap.sourceX) +", " + str(radMap.sourceY) +") and the upper coefficient is " + str(radMap.upperCoefficient))
     print("The predicted source coordinates are (" + str(results.x[1]) + ", " + str(results.x[2]) +") and the upper coefficient is " + str(results.x[0]))
-
+    print("The algorithm finished in " + str(steps) + " steps")
     # print(travel_log)
     # print(result_log)
     #Below is code responsible for plotting the path in a graph
@@ -160,7 +162,8 @@ def LeastSquaresOneRun():
     plt.plot(xCoordList, yCoordList)
     plt.scatter(radMap.sourceX, radMap.sourceY, c= "red")
     plt.show()
-
+    # print(coordinates)
+    # print(travel_log)
 
     return coordinateError
 
