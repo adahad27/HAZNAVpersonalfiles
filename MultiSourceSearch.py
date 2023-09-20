@@ -238,9 +238,9 @@ class particleFilter():
 
 
     #This function is used to plot all the important stuff like the best guess, or the flight path, etc.
-    def graph_plotter(self, particles, map, ms):      
-
-        plt.scatter(particles[:, 0], particles[:, 1])
+    def graph_plotter(self, particles, map, ms, weights):      
+        good_weights = np.where(weights > 0.9)
+        plt.scatter(particles[good_weights][:, 0], particles[good_weights][:, 1], c = "green")
         #plt.plot(self.flight_log[:,0], self.flight_log[:,1], c = "green")
         plt.scatter(map.getCoordArray()[:,0], map.getCoordArray()[:,1], c= "red") #Will need to make sure that internally, when sourceList is passed to this function, it is passed as an array
         plt.plot(self.flight_log[:,0], self.flight_log[:,1]) #This prints the travel path of the drone
@@ -505,7 +505,7 @@ class particleFilter():
             self.numRuns +=1
             
             
-            if(self.numRuns == 5):
+            if(self.numRuns == 4):
                 good_weights = np.where(weights > 0.90)
 
                 #print(type(good_weights))
@@ -532,7 +532,7 @@ class particleFilter():
                 break
             
             
-        self.graph_plotter(particles, self.sourceList, ms)
+        self.graph_plotter(particles, self.sourceList, ms, weights)
         
         
         # print("The actual position was (" + str(self.source.sourceX) +", " + str(self.source.sourceY)+")")
