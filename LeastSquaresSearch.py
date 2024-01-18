@@ -62,31 +62,57 @@ def LeastSquaresOneRun():
         xCoord = 0
         yCoord = 0
 
-    class radiationMap:
-        #This map is meant to model the map of radiation, it returns radiation count based on position from the source
-        def __init__(self, sourceX, sourceY, upperCoefficient, noise):
+    class radiationSource:
+
+        def __init__(self, sourceX, sourceY, upperCoefficient):
             self.sourceX = sourceX
             self.sourceY = sourceY
-            self.noise = noise
             self.upperCoefficient = upperCoefficient
+
+
+        def radCount(self, location):#location is passed as an array methinks?
+            if(self.sourceX == location[0] and self.sourceY == location[1]):
+                
+                return 2000
+            return (self.upperCoefficient/((self.sourceX - location[0])**2 + (self.sourceY - location[1])**2))
+        
+        def setIntensity(self, newIntensity):
+            self.upperCoefficient = newIntensity
+
+        def getIntensity(self):
+            return self.upperCoefficient
+
+        def intensityReducer(self, reduction):
+            self.upperCoefficient = self.upperCoefficient * reduction
+
+        def returnCoords(self):
+            return [self.sourceX, self.sourceY]
+
+    class radiationMap:
+        #This map is meant to model the map of radiation, it returns radiation count based on position from the source
+        def __init__(self, sourceList):
+            # self.noise = noise
+            self.sourceList = np.array(sourceList)
+        
+        def getTotalRadCount(self, location, locatedSourceList):
+            totalRadCount = 0
+            #return self.sourceList[1].radCount(location)
+            for source in self.sourceList:
+                totalRadCount += source.radCount(location)
+            for locatedSource in locatedSourceList:
+                tempVar = locatedSource.radCount(location)
+                
+                totalRadCount -= locatedSource.radCount(location)
             
 
-        def getRadCount(self, xCoord, yCoord):
-            if(xCoord == self.sourceX and yCoord == self.sourceY):
-                return 2000
-                #Setting the max of the value so that when the drone reaches here, it doesn't bug out
-            else:
-                noiseContribution = 0
-                if(self.noise):
-                    noiseContribution = random.random()/100
-                return self.upperCoefficient/((xCoord-self.sourceX)**2 + (yCoord-self.sourceY)**2) + noiseContribution
+        
 
 
     drone = Drone()
     #random.randint(0,10)
     radMap = radiationMap(sourceX = 9 , sourceY = 7, upperCoefficient = 1, noise = False)
 
-    coordinates = np.array([[drone.xCoord, drone.yCoord, radMap.getRadCount(drone.xCoord, drone.yCoord)]])# the array should have 2 dimensions. 
+    coordinates = np.array([[drone.xCoord, drone.yCoord, radMap.getTotalRadCount(drone.xCoord, drone.yCoord)]])# the array should have 2 dimensions. 
     
     initial_guess = [1, 5, 5]
 
@@ -110,9 +136,9 @@ def LeastSquaresOneRun():
             break
         
         
-        currCoords = np.array([[drone.xCoord, drone.yCoord, radMap.getRadCount(drone.xCoord, drone.yCoord)]])
+        currCoords = np.array([[drone.xCoord, drone.yCoord, radMap.getTotalRadCount(drone.xCoord, drone.yCoord)]])
         extraIncrementArray = polarConversion(initial_guess[1], initial_guess[2],0.5)
-        extraCoords = np.array([[drone.xCoord + extraIncrementArray[0], drone.yCoord + extraIncrementArray[1], radMap.getRadCount(drone.xCoord + extraIncrementArray[0], drone.yCoord + extraIncrementArray[1])]])
+        extraCoords = np.array([[drone.xCoord + extraIncrementArray[0], drone.yCoord + extraIncrementArray[1], radMap.getTotalRadCount(drone.xCoord + extraIncrementArray[0], drone.yCoord + extraIncrementArray[1])]])
         
         coordinates = np.concatenate((coordinates, currCoords, extraCoords)) #the argument has to be passed in as a tuple idk why, probably some interface thing to make sure that nothing is modified?
 
@@ -130,7 +156,7 @@ def LeastSquaresOneRun():
         drone.xCoord += incrementArray[0]
         drone.yCoord += incrementArray[1]
         currCoords = [drone.xCoord, drone.yCoord]
-        if(radMap.getRadCount(currCoords[0], currCoords[1]) < radMap.getRadCount(previousCoords[0], previousCoords[1])):
+        if(radMap.getTotalRadCount(currCoords[0], currCoords[1]) < radMap.getTotalRadCount(previousCoords[0], previousCoords[1])):
             #then we make it go in the opposite direction
             #print("SPECIAL CASE HAS BEEN REACHED AND HOPEFULLY THIS WORKS")
             courseAngle = math.atan((previousCoords[1]-currCoords[1])/(previousCoords[0]-currCoords[0])) + math.pi
