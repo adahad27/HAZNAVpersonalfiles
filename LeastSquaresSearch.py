@@ -59,8 +59,8 @@ def LeastSquaresOneRun():
 
     class Drone:
         #This is just a struct for keeping this data glued together
-        xCoord = 0
-        yCoord = 0
+        xCoord = 1.5
+        yCoord = 1.5
 
     class radiationSource:
 
@@ -90,28 +90,42 @@ def LeastSquaresOneRun():
 
     class radiationMap:
         #This map is meant to model the map of radiation, it returns radiation count based on position from the source
-        def __init__(self, sourceList):
-            # self.noise = noise
-            self.sourceList = np.array(sourceList)
+        # def __init__(self, sourceList):
+        #     # self.noise = noise
+        #     self.sourceList = np.array(sourceList)
+        def __init__(self, sourceList, noise):
+            self.sourceX = sourceList[0].sourceX
+            self.sourceY = sourceList[0].sourceY
+            self.upperCoefficient = sourceList[0].upperCoefficient
+            self.sourceList = sourceList
+            # self.source = radiationSource(sourceX, sourceY, upperCoefficient)
+            self.noise = noise
+
         
-        def getTotalRadCount(self, location, locatedSourceList):
+
+        def getTotalRadCount(self, xCoord, yCoord):
             totalRadCount = 0
-            #return self.sourceList[1].radCount(location)
             for source in self.sourceList:
-                totalRadCount += source.radCount(location)
-            for locatedSource in locatedSourceList:
-                tempVar = locatedSource.radCount(location)
-                
-                totalRadCount -= locatedSource.radCount(location)
+                totalRadCount += source.radCount([xCoord, yCoord])
+            return totalRadCount
+
+
+
+        # def getTotalRadCount(self, xCoord, yCoord):
+        #     return self.source.radCount([xCoord, yCoord])
+
             
 
         
-
+    source1 = radiationSource(2, 2, 40)
+    source2 = radiationSource(1, 5, 90)
+    source3 = radiationSource(9, 9, 100)
+    sourceList = [source1, source2, source3]
 
     drone = Drone()
     #random.randint(0,10)
-    radMap = radiationMap(sourceX = 9 , sourceY = 7, upperCoefficient = 1, noise = False)
-
+    # radMap = radiationMap(sourceX = 9 , sourceY = 7, upperCoefficient = 1, noise = False)
+    radMap = radiationMap(sourceList=sourceList, noise = False)
     coordinates = np.array([[drone.xCoord, drone.yCoord, radMap.getTotalRadCount(drone.xCoord, drone.yCoord)]])# the array should have 2 dimensions. 
     
     initial_guess = [1, 5, 5]
@@ -120,9 +134,9 @@ def LeastSquaresOneRun():
     currCoords = [drone.xCoord, drone.yCoord]
     previousCoords = [drone.xCoord + 1, drone.yCoord + 1]
     
-    prevRes = [0, 0, 0]
+    prevRes = [0, 1.5, 1.5]
 
-    travel_log = np.array([[0,0]]) #Replace (0,0) with the start position of the drone if it isn't (0,0)
+    travel_log = np.array([[1.5,1.5]]) #Replace (0,0) with the start position of the drone if it isn't (0,0)
     result_log = np.array([initial_guess])
 
     debugSum = 0
@@ -137,7 +151,7 @@ def LeastSquaresOneRun():
         
         
         currCoords = np.array([[drone.xCoord, drone.yCoord, radMap.getTotalRadCount(drone.xCoord, drone.yCoord)]])
-        extraIncrementArray = polarConversion(initial_guess[1], initial_guess[2],0.5)
+        extraIncrementArray = polarConversion(initial_guess[1], initial_guess[2],0.25)
         extraCoords = np.array([[drone.xCoord + extraIncrementArray[0], drone.yCoord + extraIncrementArray[1], radMap.getTotalRadCount(drone.xCoord + extraIncrementArray[0], drone.yCoord + extraIncrementArray[1])]])
         
         coordinates = np.concatenate((coordinates, currCoords, extraCoords)) #the argument has to be passed in as a tuple idk why, probably some interface thing to make sure that nothing is modified?
