@@ -29,7 +29,7 @@ Will update this if I think of anything more to add
 Last updated on 08/05/2023
 
 """
-def LeastSquaresOneRun():    
+def LeastSquaresOneRun(SourceList, starting_pos, prediction):    
 
     def NLS(beta, coordinates):
         
@@ -55,12 +55,23 @@ def LeastSquaresOneRun():
         yCoordIncrement = hypotenuse * math.sin(courseAngle)
         return [xCoordIncrement, yCoordIncrement]
 
+    def polarConversion(current_pos, target_pos, distance):
+        xdiff = target_pos[0]-current_pos[0]
+        ydiff = target_pos[1]-current_pos[1]
+        theta = math.atan(ydiff/xdiff)
+        if xdiff < 0:
+            #This was added because of the inherent limitations of using arctan() since the range of the
+            #function is limited to -pi/2 to pi/2
+            theta = theta + math.pi
+        # if(abs(distance*math.cos(theta)) > target_pos[0] or abs(distance*math.sin(theta)) > target_pos[1]):
+        #     return [xdiff, ydiff]
+        return [distance*math.cos(theta), distance*math.sin(theta)]
 
 
     class Drone:
         #This is just a struct for keeping this data glued together
-        xCoord = 1.5
-        yCoord = 1.5
+        xCoord = starting_pos[0]
+        yCoord = starting_pos[1]
 
     class radiationSource:
 
@@ -117,26 +128,29 @@ def LeastSquaresOneRun():
             
 
         
-    source1 = radiationSource(2, 2, 40)
-    source2 = radiationSource(1, 5, 90)
-    source3 = radiationSource(9, 9, 100)
-    sourceList = [source1, source2, source3]
+    # source1 = radiationSource(2, 2, 40)
+    # source2 = radiationSource(1, 5, 90)
+    # source3 = radiationSource(9, 9, 100)
+    # sourceList = [source1, source2, source3]
 
     drone = Drone()
     #random.randint(0,10)
     # radMap = radiationMap(sourceX = 9 , sourceY = 7, upperCoefficient = 1, noise = False)
-    radMap = radiationMap(sourceList=sourceList, noise = False)
+    radMap = radiationMap(sourceList=SourceList, noise = False)
+    
     coordinates = np.array([[drone.xCoord, drone.yCoord, radMap.getTotalRadCount(drone.xCoord, drone.yCoord)]])# the array should have 2 dimensions. 
     
-    initial_guess = [1, 5, 5]
+    initial_guess = [1, prediction[0], prediction[1]]
 
 
     currCoords = [drone.xCoord, drone.yCoord]
     previousCoords = [drone.xCoord + 1, drone.yCoord + 1]
     
-    prevRes = [0, 1.5, 1.5]
+    # prevRes = [0, starting_pos[0], starting_pos[1]]
+    prevRes = [0, prediction[0], prediction[1]]
 
-    travel_log = np.array([[1.5,1.5]]) #Replace (0,0) with the start position of the drone if it isn't (0,0)
+    # travel_log = np.array([[prediction[0],prediction[1]]]) #Replace (0,0) with the start position of the drone if it isn't (0,0)
+    travel_log = np.array([[starting_pos[0], starting_pos[1]]])
     result_log = np.array([initial_guess])
 
     debugSum = 0
@@ -151,7 +165,7 @@ def LeastSquaresOneRun():
         
         
         currCoords = np.array([[drone.xCoord, drone.yCoord, radMap.getTotalRadCount(drone.xCoord, drone.yCoord)]])
-        extraIncrementArray = polarConversion(initial_guess[1], initial_guess[2],0.25)
+        extraIncrementArray = polarConversion([drone.xCoord, drone.yCoord],[initial_guess[1], initial_guess[2]],0.25)
         extraCoords = np.array([[drone.xCoord + extraIncrementArray[0], drone.yCoord + extraIncrementArray[1], radMap.getTotalRadCount(drone.xCoord + extraIncrementArray[0], drone.yCoord + extraIncrementArray[1])]])
         
         coordinates = np.concatenate((coordinates, currCoords, extraCoords)) #the argument has to be passed in as a tuple idk why, probably some interface thing to make sure that nothing is modified?
@@ -162,7 +176,7 @@ def LeastSquaresOneRun():
         prevRes = initial_guess
         initial_guess = results.x
 
-        incrementArray = polarConversion(results.x[1], results.x[2],0.5)
+        incrementArray = polarConversion([drone.xCoord, drone.yCoord],[results.x[1], results.x[2]],0.5)
         
         
         
@@ -170,13 +184,13 @@ def LeastSquaresOneRun():
         drone.xCoord += incrementArray[0]
         drone.yCoord += incrementArray[1]
         currCoords = [drone.xCoord, drone.yCoord]
-        if(radMap.getTotalRadCount(currCoords[0], currCoords[1]) < radMap.getTotalRadCount(previousCoords[0], previousCoords[1])):
-            #then we make it go in the opposite direction
-            #print("SPECIAL CASE HAS BEEN REACHED AND HOPEFULLY THIS WORKS")
-            courseAngle = math.atan((previousCoords[1]-currCoords[1])/(previousCoords[0]-currCoords[0])) + math.pi
-            currCoords = previousCoords
-            #CHANGE THE 2 HERE ACCORDING TO DISTANCE IN POLARCONVERSION, WAS TOO LAZY TO FIGURE OUT ANOTHER WAY OF DOING THIS
-            currCoords = [currCoords[0] + 0.5*math.cos(courseAngle), currCoords[1] + 0.5*math.sin(courseAngle)]
+        # if(radMap.getTotalRadCount(currCoords[0], currCoords[1]) < radMap.getTotalRadCount(previousCoords[0], previousCoords[1])):
+        #     #then we make it go in the opposite direction
+        #     #print("SPECIAL CASE HAS BEEN REACHED AND HOPEFULLY THIS WORKS")
+        #     courseAngle = math.atan((previousCoords[1]-currCoords[1])/(previousCoords[0]-currCoords[0])) + math.pi
+        #     currCoords = previousCoords
+        #     #CHANGE THE 2 HERE ACCORDING TO DISTANCE IN POLARCONVERSION, WAS TOO LAZY TO FIGURE OUT ANOTHER WAY OF DOING THIS
+        #     currCoords = [currCoords[0] + 0.5*math.cos(courseAngle), currCoords[1] + 0.5*math.sin(courseAngle)]
         
         
         #This just updates the respective logs needed in case of testing/debugging
@@ -199,14 +213,14 @@ def LeastSquaresOneRun():
 
     plt.plot(xCoordList, yCoordList)
     plt.scatter(radMap.sourceX, radMap.sourceY, c= "red")
-    plt.show()
+    # plt.show()
 
 
-    return coordinateError
+    return [results.x[1], results.x[2]]
 
 
-totalCoordinateError = 0
-print("The error in measurement for this run was " + str(LeastSquaresOneRun()))
+# totalCoordinateError = 0
+# print("The error in measurement for this run was " + str(LeastSquaresOneRun()))
 # for i in range(10):
 #     totalCoordinateError += LeastSquaresOneRun()
 

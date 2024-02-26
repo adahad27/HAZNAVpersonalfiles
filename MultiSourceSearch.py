@@ -4,7 +4,7 @@ from matplotlib import pyplot as plt
 import random
 from sklearn.cluster import MeanShift, KMeans
 import math
-# from LeastSquaresSearch import LeastSquaresOneRun
+from LeastSquaresSearch import LeastSquaresOneRun
 
 
 
@@ -56,6 +56,8 @@ class radiationMap:
     def __init__(self, sourceList):
         # self.noise = noise
         self.sourceList = np.array(sourceList)
+    def getSources(self):
+        return self.sourceList
     
     def getTotalRadCount(self, location, locatedSourceList):
         totalRadCount = 0
@@ -86,10 +88,28 @@ class Drone:
         yCoord = 0
         # radSrc = radiationSource(5,5,1)
 
+class Cell:
 
+    def __init__(self, coordinates, dist) -> None:
+        self.centerCoordinate = coordinates
+        self.dist = dist
+        self.weight = 0
+    
+    def inCell(self, location):
+        if(location[0] - self.centerCoordinate[0] <= self.dist and location[1] - self.centerCoordinate[1] <= self.dist):
+            return True
+        else:
+            return False
+    
+    def addWeight(self, weightArray):
+        self.weight += np.sum(weightArray)
 
+class Grid:
 
-
+    def __init__(self, numCells) -> None:
+        self.numCells = numCells
+        self.cellList = np.array([])
+    
 
 
 
@@ -218,16 +238,16 @@ Last updated this on 10/27/2023
 
 """This is the class for the particle filter."""
 class particleFilter():
-    def __init__(self, drone, sourceList):
+    def __init__(self, drone, givenRadMap):
         
         self.drone = drone
         self.weight = np.array([])
-        self.sourceList = sourceList
+        self.radmap = givenRadMap
         self.current_average = np.array([0,0])
         self.previous_average = np.array([0,0])
         self.restartFilter = False
         self.locatedSources = np.array([])
-        self.flight_log = np.array([[drone.xCoord, drone.yCoord, sourceList.getTotalRadCount([drone.xCoord, drone.yCoord],self.locatedSources)]])
+        self.flight_log = np.array([[drone.xCoord, drone.yCoord, self.radmap.getTotalRadCount([drone.xCoord, drone.yCoord],self.locatedSources)]])
 
     """This function is responsible for creating the particles at the start of every filtering run"""
     def create_uniform_particle_distributor(self, numParticles):
@@ -243,12 +263,26 @@ class particleFilter():
 
     #This function is used to plot all the important stuff like the best guess, or the flight path, etc.
     def graph_plotter(self, particles, map):      
-        plt.scatter(map.getCoordArray()[:,0], map.getCoordArray()[:,1], c= "red") #Will need to make sure that internally, when sourceList is passed to this function, it is passed as an array
+         #Will need to make sure that internally, when sourceList is passed to this function, it is passed as an array
         plt.plot(self.flight_log[:,0], self.flight_log[:,1]) #This prints the travel path of the drone
-        plt.scatter(particles[np.argmax(self.weight), 0], particles[np.argmax(self.weight), 1], c = "black")
+        # plt.scatter(particles[self.weight > 0.75, 0], particles[self.weight > 0.75, 1], c = "green")
+        
+        plt.scatter(particles[self.weight > np.median(self.weight), 0], particles[self.weight > np.median(self.weight), 1], c = "cyan")
+        # plt.scatter(particles[self.weight > np.percentile(self.weight, 75), 0], particles[self.weight > np.percentile(self.weight, 75), 1], c = "green")
+        # plt.scatter(particles[self.weight > np.percentile(self.weight, 25) and self.weight < np.percentile(self.weight, 50), 0], particles[self.weight > np.percentile(self.weight, 25) and self.weight < np.percentile(self.weight, 50), 1], c = "magenta")
+        plt.scatter(particles[self.weight > 0.90, 0], particles[self.weight > 0.90, 1], c = "green")
+        #plt.scatter(particles[np.argmax(self.weight), 0], particles[np.argmax(self.weight), 1], c = "black")
+        plt.scatter(map.getCoordArray()[:,0], map.getCoordArray()[:,1], c= "red")
         plt.show()
 
-
+    def graph_plotter(self, particles, map, ms):
+        # exit(1)      
+        plt.plot(self.flight_log[:,0], self.flight_log[:,1])
+        plt.scatter(particles[self.weight > np.median(self.weight), 0], particles[self.weight > np.median(self.weight), 1], c = "cyan")
+        plt.scatter(particles[self.weight > 0.90, 0], particles[self.weight > 0.90, 1], c = "green")
+        plt.scatter(map.getCoordArray()[:,0], map.getCoordArray()[:,1], c= "red")
+        # plt.scatter(ms.cluster_centers_[:,0], ms.cluster_centers_[:,1], c = "black")
+        plt.show()
 
 
 
@@ -348,18 +382,18 @@ class particleFilter():
 
     #This function is responsible for weighing the particles and also moving the drone to places 
     def particle_weight(self, particles):
-        initial_reading = self.sourceList.getTotalRadCount([self.drone.xCoord, self.drone.yCoord], self.locatedSources)
+        initial_reading = self.radmap.getTotalRadCount([self.drone.xCoord, self.drone.yCoord], self.locatedSources)
         #If you want to change the intensity reducer value, then change the variable below.
         reductionValue = 0.975        
-
+        print(initial_reading)
         """ This is to prevent negative counts from occuring when you subtract contributed counts from a source. """
         while(initial_reading < 0):
             self.locatedSources[self.locatedSources.size - 1].upperCoefficient = self.locatedSources[self.locatedSources.size - 1].upperCoefficient * reductionValue
-            initial_reading = self.sourceList.getTotalRadCount([self.drone.xCoord, self.drone.yCoord], self.locatedSources)
+            initial_reading = self.radmap.getTotalRadCount([self.drone.xCoord, self.drone.yCoord], self.locatedSources)
             print("we do some reducing with the initial value")
             if(self.locatedSources[self.locatedSources.size - 1].upperCoefficient < 0.0000000001):
                 self.locatedSources = np.delete(self.locatedSources, self.locatedSources.size-1)
-                initial_reading = self.sourceList.getTotalRadCount([self.drone.xCoord, self.drone.yCoord], self.locatedSources)
+                initial_reading = self.radmap.getTotalRadCount([self.drone.xCoord, self.drone.yCoord], self.locatedSources)
                 continue
         
         initial_intensity_estimation = self.source_intensity_estimator([self.drone.xCoord, self.drone.yCoord], initial_reading, particles)
@@ -386,7 +420,7 @@ class particleFilter():
             self.restartFilter = True
             self.drone.xCoord = 0
             self.drone.yCoord = 0
-            reading = self.sourceList.getTotalRadCount([self.drone.xCoord, self.drone.yCoord], self.locatedSources)
+            reading = self.radmap.getTotalRadCount([self.drone.xCoord, self.drone.yCoord], self.locatedSources)
             self.flight_log = np.concatenate((self.flight_log, [[self.drone.xCoord, self.drone.yCoord, reading]]))
             print("we went over in the x-dir")
             print(self.drone.xCoord + coordinate_change[0])
@@ -396,30 +430,30 @@ class particleFilter():
             self.restartFilter = True
             self.drone.xCoord = 0
             self.drone.yCoord = 0
-            reading = self.sourceList.getTotalRadCount([self.drone.xCoord, self.drone.yCoord], self.locatedSources)
+            reading = self.radmap.getTotalRadCount([self.drone.xCoord, self.drone.yCoord], self.locatedSources)
             self.flight_log = np.concatenate((self.flight_log, [[self.drone.xCoord, self.drone.yCoord, reading]]))
             print("we went over in the y-dir")
             print(self.drone.yCoord + coordinate_change[1])
             return
         self.drone.xCoord += coordinate_change[0]
         self.drone.yCoord += coordinate_change[1]
-        curr_reading = self.sourceList.getTotalRadCount([self.drone.xCoord, self.drone.yCoord], self.locatedSources)
+        curr_reading = self.radmap.getTotalRadCount([self.drone.xCoord, self.drone.yCoord], self.locatedSources)
         # counter = 0
         reductionValue = 0.975
         while(curr_reading < 0):
             self.locatedSources[self.locatedSources.size - 1].upperCoefficient = self.locatedSources[self.locatedSources.size - 1].upperCoefficient * reductionValue
-            curr_reading = self.sourceList.getTotalRadCount([self.drone.xCoord, self.drone.yCoord], self.locatedSources)
+            curr_reading = self.radmap.getTotalRadCount([self.drone.xCoord, self.drone.yCoord], self.locatedSources)
             print("we do some reducing with the current reading")
             if(self.locatedSources[self.locatedSources.size - 1].upperCoefficient < 0.0000000001):
                 self.locatedSources = np.delete(self.locatedSources, self.locatedSources.size-1)
-                curr_reading = self.sourceList.getTotalRadCount([self.drone.xCoord, self.drone.yCoord], self.locatedSources)
+                curr_reading = self.radmap.getTotalRadCount([self.drone.xCoord, self.drone.yCoord], self.locatedSources)
                 continue
         self.flight_log = np.concatenate((self.flight_log, [[self.drone.xCoord,self.drone.yCoord, curr_reading]]))
         """ This is estimating how much the count changes after we move the drone, and then mapping the 
         difference to a probability. """
         count_estimate = initial_intensity_estimation/((particles[:,0] - self.drone.xCoord)**2 + (particles[:,1] - self.drone.yCoord)**2)
         count_estimate -= curr_reading
-        count_estimate[:] = 2*np.absolute(norm.cdf(-1*abs(count_estimate[:]), loc = 0, scale = 2))
+        count_estimate[:] = 3*np.absolute(norm.cdf(-1*abs(count_estimate[:]), loc = 0, scale = 3))
         #This is needed for the convergence condition for the while loop in the run function
         self.previous_average = self.current_average
         self.current_average = self.allparticle_weight_average(particles, count_estimate, True)
@@ -437,23 +471,23 @@ class particleFilter():
             Since we're also taking measurements at different locations, we will have to make sure that we update the travel log properly. """
         self.drone.xCoord = location[0] + offset
         self.drone.yCoord = location[1]
-        readingOne = self.sourceList.getTotalRadCount([location[0] + offset, location[1]], self.locatedSources)
+        readingOne = self.radmap.getTotalRadCount([location[0] + offset, location[1]], self.locatedSources)
         
         self.flight_log = np.concatenate((self.flight_log, [[location[0] + offset, location[1], readingOne]]))
         
         self.drone.xCoord = location[0] 
         self.drone.yCoord = location[1] + offset
-        readingTwo = self.sourceList.getTotalRadCount([location[0] , location[1]+ offset], self.locatedSources)
+        readingTwo = self.radmap.getTotalRadCount([location[0] , location[1]+ offset], self.locatedSources)
         self.flight_log = np.concatenate((self.flight_log, [[location[0] , location[1]+ offset, readingTwo]]))
 
         self.drone.xCoord = location[0] - offset
         self.drone.yCoord = location[1]
-        readingThree = self.sourceList.getTotalRadCount([location[0] - offset, location[1]], self.locatedSources)
+        readingThree = self.radmap.getTotalRadCount([location[0] - offset, location[1]], self.locatedSources)
         self.flight_log = np.concatenate((self.flight_log, [[location[0] - offset, location[1], readingThree]]))
 
         self.drone.xCoord = location[0] 
         self.drone.yCoord = location[1] - offset
-        readingFour = self.sourceList.getTotalRadCount([location[0] , location[1]- offset], self.locatedSources)
+        readingFour = self.radmap.getTotalRadCount([location[0] , location[1]- offset], self.locatedSources)
         self.flight_log = np.concatenate((self.flight_log, [[location[0] , location[1]- offset, readingFour]]))
 
         estimationArray = np.array([readingOne, readingTwo, readingThree, readingFour])
@@ -468,32 +502,53 @@ class particleFilter():
     def run(self, particleNum):
         self.numRuns = 0
         counter = 0
-        while(self.sourceList.getTotalRadCount([self.flight_log[self.flight_log.shape[0]-1, 0], self.flight_log[self.flight_log.shape[0]-1, 1]], self.locatedSources) > 0):
+        while(self.radmap.getTotalRadCount([self.flight_log[self.flight_log.shape[0]-1, 0], self.flight_log[self.flight_log.shape[0]-1, 1]], self.locatedSources) > 1.5):
             counter = counter + 1
             particles = self.create_uniform_particle_distributor(numParticles=particleNum)
+            
             self.current_average = self.allparticle_weight_average(particles, np.ones(shape = (particles.shape[0])) / particles.shape[0], True)
             self.weight = np.array([])
             weights = np.array([])
             #The while loop here locates a source.
             self.restartTotal = False
             while (math.sqrt((self.current_average[0] - self.previous_average[0])**2 + (self.current_average[1] - self.previous_average[1])**2) > 0.001):
+                
                 weights = self.particle_weight(particles)
+                
+                ms = MeanShift(bandwidth = 0.5)
+                
+                
+
                 if(self.restartFilter):
                     self.restartTotal = True
                     break
                 particles = self.particle_resampler(particles, weights)
                 self.numRuns +=1
+                weights = self.weight_normalizer(weights)
+                print(np.max(weights))
+                # ms.fit((particles[np.where(weights > 0.95), :])[0])
+                self.graph_plotter(particles, self.radmap, ms)
             if(self.restartTotal):
                 continue
             # This is currently assuming that the drone will always be able to fly there when we know that is not the case. Perhaps we should consider taking an average of all the points instead.
-            approximatedIntensity = self.located_source_estimator([particles[np.argmax(self.weight), 0], particles[np.argmax(self.weight), 1]], 0.5)
+            # self.graph_plotter(particles, self.radmap)
+
+
+            
+            self.drone.xCoord, self.drone.yCoord = LeastSquaresOneRun(self.radmap.getSources(), [self.drone.xCoord, self.drone.yCoord], [particles[np.argmax(self.weight), 0], particles[np.argmax(self.weight), 1]])
+            
+            
+            
+            
+            locatedSourceX, locatedSourceY = self.drone.xCoord, self.drone.yCoord
+            approximatedIntensity = self.located_source_estimator([self.drone.xCoord, self.drone.yCoord], 0.5)
             # The reason why there is a -5 there, is because the last 4 locations to be added were the ones that we forced when we were flying around the source
             if(self.locatedSources.size == 0):
-                self.locatedSources = np.array([radiationSource(self.flight_log[self.flight_log.shape[0]-5, 0], self.flight_log[self.flight_log.shape[0]-5, 1], approximatedIntensity)])
+                self.locatedSources = np.array([radiationSource(locatedSourceX, locatedSourceY, approximatedIntensity)])
             else:
-                self.locatedSources = np.concatenate((self.locatedSources, [radiationSource(self.flight_log[self.flight_log.shape[0]-5, 0], self.flight_log[self.flight_log.shape[0]-5, 1], approximatedIntensity)]))  
+                self.locatedSources = np.concatenate((self.locatedSources, [radiationSource(locatedSourceX, locatedSourceY, approximatedIntensity)]))  
             print(approximatedIntensity)
-            self.graph_plotter(particles, self.sourceList)
+            self.graph_plotter(particles, self.radmap)
             
 
 
@@ -507,26 +562,27 @@ class particleFilter():
 
             originalIntensity = self.locatedSources[self.locatedSources.size-1].upperCoefficient
             intensityOvershot = False
-            reductionValue = 0.975
+            reductionValue = 0.99
             sentinelValue = 0.001
             loopValue = 0
-            while(self.sourceList.getTotalRadCount([self.flight_log[self.flight_log.shape[0]-1, 0], self.flight_log[self.flight_log.shape[0]-1, 1]], self.locatedSources) < 0):
-                print("before decrease")
-                print([self.locatedSources[self.locatedSources.size-1].sourceX,self.locatedSources[self.locatedSources.size-1].sourceY,self.locatedSources[self.locatedSources.size-1].upperCoefficient])
+            while(self.radmap.getTotalRadCount([self.flight_log[self.flight_log.shape[0]-1, 0], self.flight_log[self.flight_log.shape[0]-1, 1]], self.locatedSources) < 1):
+                # print("before decrease")
+                # print([self.locatedSources[self.locatedSources.size-1].sourceX,self.locatedSources[self.locatedSources.size-1].sourceY,self.locatedSources[self.locatedSources.size-1].upperCoefficient])
                 self.locatedSources[self.locatedSources.size-1].upperCoefficient = self.locatedSources[self.locatedSources.size-1].upperCoefficient * reductionValue
                 loopValue += 1
                 print("after decrease")
-                print(self.sourceList.getTotalRadCount([self.flight_log[self.flight_log.shape[0]-1, 0], self.flight_log[self.flight_log.shape[0]-1, 1]], self.locatedSources))
+                # print(self.radmap.getTotalRadCount([self.flight_log[self.flight_log.shape[0]-1, 0], self.flight_log[self.flight_log.shape[0]-1, 1]], self.locatedSources))
+                print(self.radmap.getTotalRadCount([self.flight_log[self.flight_log.shape[0]-1, 0], self.flight_log[self.flight_log.shape[0]-1, 1]], self.locatedSources))
                 print([self.locatedSources[self.locatedSources.size-1].sourceX,self.locatedSources[self.locatedSources.size-1].sourceY,self.locatedSources[self.locatedSources.size-1].upperCoefficient])
                 if(self.locatedSources[self.locatedSources.size-1].upperCoefficient < sentinelValue * originalIntensity):
                     intensityOvershot = True
                     break
-            print(self.locatedSources[self.locatedSources.size-1].upperCoefficient )
+            # print(self.locatedSources[self.locatedSources.size-1].upperCoefficient )
             if(intensityOvershot):
                 break
         for source in self.locatedSources:
             print([source.sourceX, source.sourceY, source.upperCoefficient])
-        self.graph_plotter(particles, self.sourceList)
+        self.graph_plotter(particles, self.radmap)
         
         
 
