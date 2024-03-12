@@ -5,7 +5,7 @@ import random
 from sklearn.cluster import MeanShift, KMeans
 import math
 from LeastSquaresSearch import LeastSquaresOneRun
-
+from matplotlib import colormaps
 
 
 #The purpose of this function is to figure out what coordinates to go to if you want to travel a certain
@@ -178,20 +178,21 @@ class Grid:
 
 def MultiSourceRadSim():
     #radiationSource(random.random() * 10 ,random.random() * 10, random.randint(1,10))
-    source1 = radiationSource(5,7,30)
-    source2 = radiationSource(8,5,30)
-    source3 = radiationSource(2,3,40)
+    # source1 = radiationSource(5,7,30)
+    source2 = radiationSource(8,5,3000)
+    source3 = radiationSource(2,3,4000)
     
 
     # source1 = radiationSource(random.random() * 10, random.random() * 10, random.randint(10,100))
     # source2 = radiationSource(random.random() * 10, random.random() * 10, random.randint(10,100))
     # source3 = radiationSource(random.random() * 10, random.random() * 10, random.randint(10,100))
     
-    sourceList = [source1, source2, source3]
+    # sourceList = [source1, source2, source3]
+    sourceList = [source2, source3]
     # source4 = radiationSource(random.random() * 10, random.random() * 10, random.randint(1,10))
     # source5 = radiationSource(random.random() * 10, random.random() * 10, random.randint(1,10))
     # sourceList = [source1, source2, source3, source4, source5]
-    print([source1.sourceX, source1.sourceY, source1.upperCoefficient])
+    # print([source1.sourceX, source1.sourceY, source1.upperCoefficient])
     print([source2.sourceX, source2.sourceY, source2.upperCoefficient])
     print([source3.sourceX, source3.sourceY, source3.upperCoefficient])
     ourRadMap = radiationMap(sourceList= sourceList)
@@ -202,10 +203,17 @@ def MultiSourceRadSim():
     drone = Drone()
 
     pf = particleFilter(drone, ourRadMap) #The input to this is how many times you want the algorithm to be run, the drone object, and the source list which I'm currently passing in as just one object
+    
+    heatmap = np.array([])
+    for cell in pf.grid.cellList:
+        heatmap = np.concatenate((heatmap, np.array([math.log10(ourRadMap.getTotalRadCount(cell.centerCoordinate, []))])))
+    heatmap = heatmap.reshape((10, 10))
+    heatmap = heatmap.T
+
+    plt.imshow(heatmap,cmap = "inferno", origin = "lower")
+    plt.show()
+    
     pf.run(30000) #The input to this is how many particles you want
-
- 
-
 
 
 
@@ -303,6 +311,7 @@ class particleFilter():
         self.locatedSources = np.array([])
         self.flight_log = np.array([[drone.xCoord, drone.yCoord, self.radmap.getTotalRadCount([drone.xCoord, drone.yCoord],self.locatedSources)]])
         self.grid = Grid(10)
+        self.grid2 = Grid(100)
         self.fromClusterCell = False
 
     """This function is responsible for creating the particles at the start of every filtering run"""
@@ -323,17 +332,17 @@ class particleFilter():
         plt.plot(self.flight_log[:,0], self.flight_log[:,1]) #This prints the travel path of the drone
         
         
-        plt.scatter(particles[self.weight > np.median(self.weight), 0], particles[self.weight > np.median(self.weight), 1], c = "cyan")
-        plt.scatter(particles[self.weight > 0.90, 0], particles[self.weight > 0.90, 1], c = "green")
+        # plt.scatter(particles[self.weight > np.median(self.weight), 0], particles[self.weight > np.median(self.weight), 1], c = "cyan")
+        # plt.scatter(particles[self.weight > 0.90, 0], particles[self.weight > 0.90, 1], c = "green")
         
         plt.scatter(map.getCoordArray()[:,0], map.getCoordArray()[:,1], c= "red")
         plt.show()
 
     def graph_plotter(self, particles, map, ms):
         plt.plot(self.flight_log[:,0], self.flight_log[:,1])
-        plt.scatter(particles[self.weight > np.percentile(self.weight, 90), 0], particles[self.weight > np.percentile(self.weight, 90), 1], c = "green")
+        # plt.scatter(particles[self.weight > np.percentile(self.weight, 90), 0], particles[self.weight > np.percentile(self.weight, 90), 1], c = "green")
         plt.scatter(map.getCoordArray()[:,0], map.getCoordArray()[:,1], c= "red")
-        plt.scatter(ms.cluster_centers_[:,0], ms.cluster_centers_[:,1], c = "black")
+        # plt.scatter(ms.cluster_centers_[:,0], ms.cluster_centers_[:,1], c = "black")
         plt.show()
 
 
