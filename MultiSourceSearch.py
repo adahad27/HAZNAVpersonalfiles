@@ -180,8 +180,8 @@ class Grid:
 def MultiSourceRadSim():
     #radiationSource(random.random() * 10 ,random.random() * 10, random.randint(1,10))
     # source1 = radiationSource(5,7,30)
-    source2 = radiationSource(8,5,3000)
-    source3 = radiationSource(2,3,4000)
+    source2 = radiationSource(8,5,30)
+    source3 = radiationSource(2,3,40)
     
 
     # source1 = radiationSource(random.random() * 10, random.random() * 10, random.randint(10,100))
@@ -205,14 +205,14 @@ def MultiSourceRadSim():
 
     pf = particleFilter(drone, ourRadMap) #The input to this is how many times you want the algorithm to be run, the drone object, and the source list which I'm currently passing in as just one object
     
-    heatmap = np.array([])
-    for cell in pf.grid2.cellList:
-        heatmap = np.concatenate((heatmap, np.array([math.log10(ourRadMap.getTotalRadCount(cell.centerCoordinate, []))])))
-    heatmap = heatmap.reshape((100, 100))
-    heatmap = heatmap.T
+    # heatmap = np.array([])
+    # for cell in pf.grid2.cellList:
+    #     heatmap = np.concatenate((heatmap, np.array([math.log10(ourRadMap.getTotalRadCount(cell.centerCoordinate, []))])))
+    # heatmap = heatmap.reshape((100, 100))
+    # heatmap = heatmap.T
 
-    plt.imshow(heatmap,cmap = "inferno", origin = "lower")
-    plt.show()
+    # plt.imshow(heatmap,cmap = "inferno", origin = "lower")
+    # plt.show()
     
     pf.run(30000) #The input to this is how many particles you want
 
@@ -314,6 +314,8 @@ class particleFilter():
         self.grid = Grid(10)
         self.grid2 = Grid(100)
         self.fromClusterCell = False
+        self.distance_covered = 0
+        self.steps_taken = 0
 
     """This function is responsible for creating the particles at the start of every filtering run"""
     def create_uniform_particle_distributor(self, numParticles):
@@ -346,7 +348,7 @@ class particleFilter():
 
     def graph_plotter(self, particles, map, ms):
         plt.plot(self.flight_log[:,0], self.flight_log[:,1], color = 'blue')
-        # plt.scatter(particles[self.weight > np.percentile(self.weight, 90), 0], particles[self.weight > np.percentile(self.weight, 90), 1], c = "green")
+        plt.scatter(particles[self.weight > np.median(self.weight), 0], particles[self.weight > np.median(self.weight), 1], c = "cyan")
         plt.scatter(map.getCoordArray()[:,0], map.getCoordArray()[:,1], c= "red", marker = 'x')
         plt.scatter(ms.cluster_centers_[:,0], ms.cluster_centers_[:,1], c = "black")
         plt.scatter(self.flight_log[:,0], self.flight_log[:,1], color = 'blue', s = 0.1)
@@ -497,6 +499,7 @@ class particleFilter():
                         self.drone.yCoord = self.clusterCell.centerCoordinate[1]
                         self.restartFilter = True
                         self.flight_log = np.concatenate((self.flight_log, [[self.drone.xCoord,self.drone.yCoord, self.radmap.getTotalRadCount([self.drone.xCoord, self.drone.yCoord], self.locatedSources)]]))
+                        self.steps_taken += 1
         else:
             particle_index = random.randint(0, np.shape(particles)[0]-1) #np.shape(particles) returns an N x 2 tuple, of which we only care about the N
             particle_of_interest = np.array([5, 5])
@@ -504,16 +507,27 @@ class particleFilter():
 
 
 
-
+        
 
         
-        coordinate_change = polar_conversion([self.drone.xCoord,self.drone.yCoord], particle_of_interest, 1/(initial_reading))
+        coordinate_change = polar_conversion([self.drone.xCoord,self.drone.yCoord], particle_of_interest, self.step_size(initial_reading))
+        self.distance_covered += self.step_size(initial_reading)
+        
+
+
+
+
+
+
+
+
         self.restartFilter =  False
         self.drone.xCoord += coordinate_change[0]
         self.drone.yCoord += coordinate_change[1]
         curr_reading = self.radmap.getTotalRadCount([self.drone.xCoord, self.drone.yCoord], self.locatedSources)
         
         self.flight_log = np.concatenate((self.flight_log, [[self.drone.xCoord,self.drone.yCoord, curr_reading]]))
+        self.steps_taken += 1
         """ This is estimating how much the count changes after we move the drone, and then mapping the 
         difference to a probability. """
         count_estimate = initial_intensity_estimation/((particles[:,0] - self.drone.xCoord)**2 + (particles[:,1] - self.drone.yCoord)**2)
@@ -582,6 +596,13 @@ class particleFilter():
             weights = np.array([])
             #The while loop here locates a source.
             self.restartTotal = False
+            self.step_size = lambda x : 1 / (math.sqrt(x))
+
+
+
+
+
+
             while (math.sqrt((self.current_average[0] - self.previous_average[0])**2 + (self.current_average[1] - self.previous_average[1])**2) > 0.001):
                 
                 weights = self.particle_weight(particles)
@@ -607,8 +628,12 @@ class particleFilter():
 
             if(self.restartTotal):
                 continue
-            self.drone.xCoord, self.drone.yCoord, approximatedIntensity, self.flight_log = LeastSquaresOneRun(self.radmap.getSources(), [self.drone.xCoord, self.drone.yCoord], [particles[np.argmax(self.weight), 0], particles[np.argmax(self.weight), 1]], self.flight_log)
-            self.graph_plotter_clusterless(particles, self.radmap)
+            approximatedIntensity = 2# The only reason this is here is to get my code to work initially, this does not have any meaning apart from keeping my code from erroring out.
+            if np.sum(self.weight) != 0:
+                self.drone.xCoord, self.drone.yCoord, approximatedIntensity, self.flight_log, self.distance_covered, self.steps_taken = LeastSquaresOneRun(self.radmap.getSources(), [self.drone.xCoord, self.drone.yCoord], [particles[np.argmax(self.weight), 0], particles[np.argmax(self.weight), 1]], self.flight_log, self.step_size, self.distance_covered, self.steps_taken)
+            # else:
+            #     self.drone.xCoord, self.drone.yCoord, approximatedIntensity, self.flight_log = LeastSquaresOneRun(self.radmap.getSources(), [self.drone.xCoord, self.drone.yCoord], [self.drone.xCoord, self.drone.yCoord], self.flight_log)
+            
             
             """Will add a function here which reroutes to cells."""
             
@@ -620,6 +645,18 @@ class particleFilter():
             else:
                 self.locatedSources = np.concatenate((self.locatedSources, [radiationSource(locatedSourceX, locatedSourceY, approximatedIntensity)]))  
             # print(approximatedIntensity)
+            if(self.locatedSources.shape[0] == self.radmap.getCoordArray().shape[0]):
+                for index, element in enumerate(self.locatedSources):
+                    self.error += distance(element.returnCoords(), self.radmap.getCoordArray()[index, :])
+                print("Error associated with predicted and actual distance from source:")
+                print(self.error)
+                print("Distance covered:")
+                print(self.distance_covered)
+                print("Number of steps taken:")
+                print(self.steps_taken)
+                self.graph_plotter_clusterless(particles, self.radmap)
+                exit()
+            
             self.grid.sourceWeightReduction([locatedSourceX, locatedSourceY])
             self.clusterCell = self.grid.maxCell()
             self.clusterCell.visited = True
@@ -627,12 +664,9 @@ class particleFilter():
             self.drone.xCoord = self.clusterCell.centerCoordinate[0]
             self.drone.yCoord = self.clusterCell.centerCoordinate[1]
             self.flight_log = np.concatenate((self.flight_log, [[self.drone.xCoord,self.drone.yCoord, self.radmap.getTotalRadCount([self.drone.xCoord, self.drone.yCoord], self.locatedSources)]]))
+            self.steps_taken += 1
             self.error = 0
-            self.graph_plotter_clusterless(particles, self.radmap)
-            if(self.locatedSources.shape[0] == self.radmap.getCoordArray().shape[0]):
-                for index, element in enumerate(self.locatedSources):
-                    self.error += distance(element.returnCoords(), self.radmap.getCoordArray()[self.radmap.getCoordArray().shape[0] - index - 1, :])
-                print(self.error)
+            # self.graph_plotter_clusterless(particles, self.radmap)
             
             
         

@@ -29,7 +29,7 @@ Will update this if I think of anything more to add
 Last updated on 08/05/2023
 
 """
-def LeastSquaresOneRun(SourceList, starting_pos, prediction, travel_log):    
+def LeastSquaresOneRun(SourceList, starting_pos, prediction, travel_log, step_size, distance_covered, steps_taken):    
 
     def NLS(beta, coordinates):
         
@@ -147,11 +147,12 @@ def LeastSquaresOneRun(SourceList, starting_pos, prediction, travel_log):
     previousCoords = [drone.xCoord + 1, drone.yCoord + 1]
     
     # prevRes = [0, starting_pos[0], starting_pos[1]]
-    prevRes = [0, prediction[0], prediction[1]]
+    prevRes = [0, 0, 0]
 
     # travel_log = np.array([[prediction[0],prediction[1]]]) #Replace (0,0) with the start position of the drone if it isn't (0,0)
     # travel_log = np.array([[starting_pos[0], starting_pos[1]]])
     travel_log = np.concatenate((travel_log, [[starting_pos[0],starting_pos[1], radMap.getTotalRadCount(starting_pos[0], starting_pos[1]) ]]))
+    steps_taken += 1
     result_log = np.array([initial_guess])
 
     debugSum = 0
@@ -163,10 +164,11 @@ def LeastSquaresOneRun(SourceList, starting_pos, prediction, travel_log):
         if(drone.xCoord > 10 or drone.yCoord > 10 or drone.xCoord < -1 or drone.yCoord < -1):
             
             break
+        initial_reading = radMap.getTotalRadCount(drone.xCoord, drone.yCoord)
         
-        
-        currCoords = np.array([[drone.xCoord, drone.yCoord, radMap.getTotalRadCount(drone.xCoord, drone.yCoord)]])
-        extraIncrementArray = polarConversion([drone.xCoord, drone.yCoord],[initial_guess[1], initial_guess[2]],0.25)
+        currCoords = np.array([[drone.xCoord, drone.yCoord, initial_reading]])
+        extraIncrementArray = polarConversion([drone.xCoord, drone.yCoord],[initial_guess[1], initial_guess[2]],step_size(initial_reading))
+        distance_covered += step_size(initial_reading)
         extraCoords = np.array([[drone.xCoord + extraIncrementArray[0], drone.yCoord + extraIncrementArray[1], radMap.getTotalRadCount(drone.xCoord + extraIncrementArray[0], drone.yCoord + extraIncrementArray[1])]])
         
         coordinates = np.concatenate((coordinates, currCoords, extraCoords)) #the argument has to be passed in as a tuple idk why, probably some interface thing to make sure that nothing is modified?
@@ -179,11 +181,12 @@ def LeastSquaresOneRun(SourceList, starting_pos, prediction, travel_log):
 
         incrementArray = polarConversion([drone.xCoord, drone.yCoord],[results.x[1], results.x[2]],0.5)
         
-        
+        distance_covered += 0.5
         
         previousCoords = [drone.xCoord, drone.yCoord]
         drone.xCoord += incrementArray[0]
         drone.yCoord += incrementArray[1]
+
         currCoords = [drone.xCoord, drone.yCoord]
         # if(radMap.getTotalRadCount(currCoords[0], currCoords[1]) < radMap.getTotalRadCount(previousCoords[0], previousCoords[1])):
         #     #then we make it go in the opposite direction
@@ -196,6 +199,7 @@ def LeastSquaresOneRun(SourceList, starting_pos, prediction, travel_log):
         
         #This just updates the respective logs needed in case of testing/debugging
         travel_log = np.concatenate((travel_log, [[currCoords[0],currCoords[1], radMap.getTotalRadCount(currCoords[0], currCoords[1]) ]]))
+        steps_taken += 1
         result_log = np.concatenate((result_log, [results.x]))
 
         
@@ -203,6 +207,7 @@ def LeastSquaresOneRun(SourceList, starting_pos, prediction, travel_log):
     currCoords = [results.x[1], results.x[2]]
     # travel_log = np.concatenate((travel_log, [currCoords]))
     travel_log = np.concatenate((travel_log, [[currCoords[0],currCoords[1], radMap.getTotalRadCount(currCoords[0], currCoords[1]) ]]))
+    steps_taken += 1
     coordinateError =  math.sqrt((radMap.sourceX - results.x[1])**2 + (radMap.sourceY - results.x[2])**2)
     print("The actual source coordinates are (" + str(radMap.sourceX) +", " + str(radMap.sourceY) +") and the upper coefficient is " + str(radMap.upperCoefficient))
     print("The predicted source coordinates are (" + str(results.x[1]) + ", " + str(results.x[2]) +") and the upper coefficient is " + str(results.x[0]))
@@ -218,7 +223,7 @@ def LeastSquaresOneRun(SourceList, starting_pos, prediction, travel_log):
     # plt.show()
 
 
-    return [results.x[1], results.x[2], results.x[0], travel_log]
+    return [results.x[1], results.x[2], results.x[0], travel_log, distance_covered, steps_taken]
 
 
 # totalCoordinateError = 0
