@@ -29,7 +29,7 @@ Will update this if I think of anything more to add
 Last updated on 08/05/2023
 
 """
-def LeastSquaresOneRun(SourceList, starting_pos, prediction):    
+def LeastSquaresOneRun(SourceList, starting_pos, prediction, travel_log):    
 
     def NLS(beta, coordinates):
         
@@ -150,7 +150,8 @@ def LeastSquaresOneRun(SourceList, starting_pos, prediction):
     prevRes = [0, prediction[0], prediction[1]]
 
     # travel_log = np.array([[prediction[0],prediction[1]]]) #Replace (0,0) with the start position of the drone if it isn't (0,0)
-    travel_log = np.array([[starting_pos[0], starting_pos[1]]])
+    # travel_log = np.array([[starting_pos[0], starting_pos[1]]])
+    travel_log = np.concatenate((travel_log, [[starting_pos[0],starting_pos[1], radMap.getTotalRadCount(starting_pos[0], starting_pos[1]) ]]))
     result_log = np.array([initial_guess])
 
     debugSum = 0
@@ -194,13 +195,14 @@ def LeastSquaresOneRun(SourceList, starting_pos, prediction):
         
         
         #This just updates the respective logs needed in case of testing/debugging
-        travel_log = np.concatenate((travel_log, [currCoords]))
+        travel_log = np.concatenate((travel_log, [[currCoords[0],currCoords[1], radMap.getTotalRadCount(currCoords[0], currCoords[1]) ]]))
         result_log = np.concatenate((result_log, [results.x]))
 
         
 
     currCoords = [results.x[1], results.x[2]]
-    travel_log = np.concatenate((travel_log, [currCoords]))
+    # travel_log = np.concatenate((travel_log, [currCoords]))
+    travel_log = np.concatenate((travel_log, [[currCoords[0],currCoords[1], radMap.getTotalRadCount(currCoords[0], currCoords[1]) ]]))
     coordinateError =  math.sqrt((radMap.sourceX - results.x[1])**2 + (radMap.sourceY - results.x[2])**2)
     print("The actual source coordinates are (" + str(radMap.sourceX) +", " + str(radMap.sourceY) +") and the upper coefficient is " + str(radMap.upperCoefficient))
     print("The predicted source coordinates are (" + str(results.x[1]) + ", " + str(results.x[2]) +") and the upper coefficient is " + str(results.x[0]))
@@ -211,12 +213,12 @@ def LeastSquaresOneRun(SourceList, starting_pos, prediction):
     xCoordList = travel_log[:, 0]
     yCoordList = travel_log[:, 1]
 
-    plt.plot(xCoordList, yCoordList)
-    plt.scatter(radMap.sourceX, radMap.sourceY, c= "red")
+    # plt.plot(xCoordList, yCoordList, color = 'blue')
+    # plt.scatter(radMap.sourceX, radMap.sourceY, c= "red")
     # plt.show()
 
 
-    return [results.x[1], results.x[2]]
+    return [results.x[1], results.x[2], results.x[0], travel_log]
 
 
 # totalCoordinateError = 0
