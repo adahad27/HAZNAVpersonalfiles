@@ -332,7 +332,7 @@ class particleFilter():
     #This function is used to plot all the important stuff like the best guess, or the flight path, etc.
     def graph_plotter_clusterless(self, particles, map):      
          #Will need to make sure that internally, when sourceList is passed to this function, it is passed as an array
-        plt.plot(self.flight_log[:,0], self.flight_log[:,1], color = 'blue') #This prints the travel path of the drone
+        plt.plot(self.flight_log[:,0], self.flight_log[:,1], color = 'blue', label = "Drone path") #This prints the travel path of the drone
         
         
         # plt.scatter(particles[self.weight > np.median(self.weight), 0], particles[self.weight > np.median(self.weight), 1], c = "cyan")
@@ -340,7 +340,9 @@ class particleFilter():
         plt.scatter(self.flight_log[:,0], self.flight_log[:,1], color = 'blue', s = 10)
         # for x, y in map.getCoordArray():
         #     plt.plot(x,y, c = "red", marker = 'x')
-        plt.scatter(map.getCoordArray()[:,0], map.getCoordArray()[:,1], c= "red", marker= 'x', s = 100)
+        plt.scatter(map.getCoordArray()[:,0], map.getCoordArray()[:,1], c= "red", marker= 'x', s = 100, label = "Sources")
+
+        plt.legend(loc = "upper left")
         plt.xlim(0, 10)
         plt.ylim(0, 10)
 
