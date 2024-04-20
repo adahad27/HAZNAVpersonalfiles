@@ -179,7 +179,7 @@ class Grid:
 
 def MultiSourceRadSim():
     #radiationSource(random.random() * 10 ,random.random() * 10, random.randint(1,10))
-    # source1 = radiationSource(5,7,30)
+    source1 = radiationSource(5,7,30)
     source2 = radiationSource(8,5,30)
     source3 = radiationSource(2,3,40)
     
@@ -188,8 +188,8 @@ def MultiSourceRadSim():
     # source2 = radiationSource(random.random() * 10, random.random() * 10, random.randint(10,100))
     # source3 = radiationSource(random.random() * 10, random.random() * 10, random.randint(10,100))
     
-    # sourceList = [source1, source2, source3]
-    sourceList = [source3, source2]
+    sourceList = [source1, source2, source3]
+    # sourceList = [source3, source2]
     # source4 = radiationSource(random.random() * 10, random.random() * 10, random.randint(1,10))
     # source5 = radiationSource(random.random() * 10, random.random() * 10, random.randint(1,10))
     # sourceList = [source1, source2, source3, source4, source5]
@@ -333,13 +333,7 @@ class particleFilter():
     def graph_plotter_clusterless(self, particles, map):      
          #Will need to make sure that internally, when sourceList is passed to this function, it is passed as an array
         plt.plot(self.flight_log[:,0], self.flight_log[:,1], color = 'blue', label = "Drone path") #This prints the travel path of the drone
-        
-        
-        # plt.scatter(particles[self.weight > np.median(self.weight), 0], particles[self.weight > np.median(self.weight), 1], c = "cyan")
-        # plt.scatter(particles[self.weight > 0.90, 0], particles[self.weight > 0.90, 1], c = "green")
         plt.scatter(self.flight_log[:,0], self.flight_log[:,1], color = 'blue', s = 10)
-        # for x, y in map.getCoordArray():
-        #     plt.plot(x,y, c = "red", marker = 'x')
         plt.scatter(map.getCoordArray()[:,0], map.getCoordArray()[:,1], c= "red", marker= 'x', s = 100, label = "Sources")
 
         plt.legend(loc = "upper left")
